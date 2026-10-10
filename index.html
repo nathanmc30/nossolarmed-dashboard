@@ -114,7 +114,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* ---------------------------------------------------------------- indicadores: uma faixa, divisórias finas */
 .dash-kpis {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   background: var(--painel); border: 1px solid var(--borda); border-radius: 14px;
 }
 .dash-kpi { display: flex; flex-direction: column; gap: 4px; padding: 16px 20px 18px; min-width: 0; }
@@ -228,8 +228,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 @media (max-width: 900px) {
   .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dash-kpi:nth-child(3) { border-left: none; }
-  .dash-kpi:nth-child(n + 3) { border-top: 1px solid var(--borda-fraca); }
+  /* 5 indicadores: o primeiro na linha toda, os outros em 2 × 2 (a coluna da direita são os ímpares) */
+  .dash-kpi:first-child { grid-column: 1 / -1; }
+  .dash-kpi + .dash-kpi { border-left: none; border-top: 1px solid var(--borda-fraca); }
+  .dash-kpi:nth-child(odd):not(:first-child) { border-left: 1px solid var(--borda-fraca); }
 }
 @media (max-width: 720px) {
   .tela { padding: 8px 16px 32px; }
@@ -365,6 +367,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return r;
   }
   const corteMaturacao = () => isoBRT(Date.parse(D.extraidoEm) - D.maturacaoDias * DIA).slice(0, 10);
+  // avaliações marcadas pela data em que a recepção marcou (não pela chegada do lead)
+  const marcadasNo = ([a, b]) => {
+    const oi = estado.origem === 'todas' ? null : D.origens.findIndex((o) => o.id === estado.origem);
+    return (D.marcadas || []).reduce((t, [h, o, q]) => { const d = h.slice(0, 10); return d >= a && d <= b && (oi == null || o === oi) ? t + q : t; }, 0);
+  };
   const aguardandoNo = ([a, b]) => (D.aguardandoAceite || []).filter((h) => h.slice(0, 10) >= a && h.slice(0, 10) <= b);
 
   // ------------------------------------------------------------ dicas ("i")
@@ -373,6 +380,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       'Agendaram: agendamento de avaliação (categoria "Avaliação …" ou "Urgência …" no Clinicorp) não cancelado. Compareceram: avaliação Atendida ou Em atendimento, ou recebeu orçamento.',
       'Orçamento e aprovação contam só para quem agendou avaliação.',
       'Orçamentos de R$ 0 e o lote importado em 27/07 ficam de fora.'],
+    marcadas: ['Avaliações (categoria "Avaliação …" ou "Urgência …") marcadas no Clinicorp no período, pela data em que a recepção marcou. Conta todas, inclusive de quem chegou em dias anteriores ou não está no Kommo. Canceladas não contam.'],
+    agendaram: ['Dos leads que chegaram no período, quantos já têm avaliação marcada. Mede conversão: um lead que chegou ontem e marcou hoje conta em ontem.'],
     casa: ['Aprovado por leads do período que não agendaram avaliação: paciente da casa que escreveu no WhatsApp e fez outro procedimento. Fica fora do funil.'],
     tempos: ['Medianas, só entre os leads que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
     semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
@@ -521,9 +530,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const kpi = (rotulo, valor, sub) => `<div class="dash-kpi"><span class="dash-kpi-rotulo">${rotulo}</span><b>${valor}</b><span class="dash-kpi-sub">${sub}</span></div>`;
     $('kpis').innerHTML =
       kpi('Leads', n(r.leads), (estado.origem === 'todas' ? 'criados no Kommo' : esc(nomeOrigem(estado.origem))) + aguardando(iv)) +
-      kpi('Agendaram', pct(r.agendou, r.leads), leadsN(r.agendou)) +
+      kpi('<span class="com-dica">Avaliações marcadas<span data-dica-local="marcadas"></span></span>', n(marcadasNo(iv)), 'no Clinicorp, no período') +
+      kpi('<span class="com-dica">Leads que agendaram<span data-dica-local="agendaram"></span></span>', pct(r.agendou, r.leads), `${leadsN(r.agendou)} de ${n(r.leads)}`) +
       kpi('Compareceram', pct(r.veio, r.agendou), `dos agendados · ${leadsN(r.veio)}`) +
       kpi('Aprovaram', pct(r.aprovou, r.leads), `${leadsN(r.aprovou)} · ${reaisCurto(r.aprovado)}` + (mat && r.leads ? ' · <span class="maturando">em maturação</span>' : ''));
+    ligarDicas($('kpis'));
   }
 
   // ------------------------------------------------------------ funil
