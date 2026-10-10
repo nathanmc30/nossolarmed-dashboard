@@ -1,0 +1,551 @@
+<!doctype html>
+<html lang="pt-BR" data-tema="claro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#efebe5">
+<meta name="color-scheme" content="light">
+<title>Funil comercial · NossoLarMed</title>
+<script>
+  // Mesmo esquema do Aspekto Business: claro é o padrão, só quem salvou 'escuro' vê o escuro.
+  try {
+    if (localStorage.getItem('aspekto:tema') === 'escuro') {
+      document.documentElement.removeAttribute('data-tema');
+      document.querySelector('meta[name=theme-color]').content = '#050505';
+      document.querySelector('meta[name=color-scheme]').content = 'dark';
+    }
+  } catch (e) {}
+</script>
+<style>
+@font-face {
+  font-family: 'Inter Variable'; font-style: normal; font-display: swap; font-weight: 100 900;
+  src: url(fontes/inter-latin-wght-normal.woff2) format('woff2-variations');
+}
+/* Tokens do Aspekto Business (web/src/estilo.css e telas/dashboard.css), escuro primeiro e o claro por cima. */
+:root {
+  --fundo: #050505; --painel: rgba(255, 255, 255, 0.035); --sup: rgba(255, 255, 255, 0.045);
+  --sup-hover: rgba(255, 255, 255, 0.075); --afundado: rgba(0, 0, 0, 0.25); --opaco: #0b0b0b;
+  --borda: rgba(255, 255, 255, 0.1); --borda-fraca: rgba(255, 255, 255, 0.06); --borda-hover: rgba(255, 255, 255, 0.2);
+  --texto: #ffffff; --texto-2: rgba(255, 255, 255, 0.65); --texto-3: rgba(255, 255, 255, 0.45); --texto-4: rgba(255, 255, 255, 0.3);
+  --texto-forte: #ffffff; --marca: #6baed5; --marca-texto: #9ed0ed; --marca-suave: rgba(107, 174, 213, 0.14);
+  --marca-anel: rgba(107, 174, 213, 0.18); --alerta: #e7b864;
+  --serie-1: #3987e5;
+  /* onde o lead parou: rampa ordinal de um azul só (validada), o neutro é quem não agendou */
+  --passo-aprovou: #9cc3f2; --passo-veio: #4d8fe0; --passo-agendou: #1f5ca8; --passo-nao: rgba(255, 255, 255, 0.16);
+  --trilho: rgba(255, 255, 255, 0.035);
+  --fonte: 'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --t: 200ms;
+}
+:root[data-tema='claro'] {
+  --fundo: #efebe5; --painel: rgba(255, 255, 255, 0.62); --sup: rgba(42, 41, 42, 0.04);
+  --sup-hover: rgba(42, 41, 42, 0.075); --afundado: rgba(255, 255, 255, 0.78); --opaco: #faf8f5;
+  --borda: rgba(42, 41, 42, 0.12); --borda-fraca: rgba(42, 41, 42, 0.07); --borda-hover: rgba(42, 41, 42, 0.24);
+  --texto: #2a292a; --texto-2: rgba(42, 41, 42, 0.82); --texto-3: rgba(42, 41, 42, 0.68); --texto-4: rgba(42, 41, 42, 0.55);
+  --texto-forte: #151415; --marca: #22385d; --marca-texto: #22385d; --marca-suave: rgba(107, 174, 213, 0.2);
+  --marca-anel: rgba(107, 174, 213, 0.38); --alerta: #9a6710;
+  --serie-1: #2a78d6;
+  --passo-aprovou: #1d5199; --passo-veio: #3f7fd4; --passo-agendou: #7eaeea; --passo-nao: rgba(42, 41, 42, 0.13);
+  --trilho: rgba(42, 41, 42, 0.04);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--fundo); color: var(--texto); font-family: var(--fonte); font-size: 14px; line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2 { margin: 0; font-weight: 600; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.sutil { color: var(--texto-3); }
+
+.tela { max-width: 1240px; margin: 0 auto; padding: 16px 24px 40px; display: flex; flex-direction: column; gap: 14px; }
+
+/* ---------------------------------------------------------------- topo: duas faixas */
+.dash-topo { display: flex; flex-direction: column; gap: 10px; }
+.dash-nav { display: flex; align-items: center; gap: 14px; min-height: 48px; padding: 0 4px; border-bottom: 1px solid var(--borda); }
+.dash-nav h1 { font-size: 20px; letter-spacing: -0.01em; }
+.dash-cliente { font-size: 13px; color: var(--texto-3); }
+.dash-nav .espaco { flex: 1; }
+.dash-atualizado { font-size: 12px; color: var(--texto-4); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.btn-icone {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 9px; border: none; background: none;
+  color: var(--texto-3); transition: background var(--t), color var(--t);
+}
+.btn-icone:hover { background: var(--sup-hover); color: var(--texto); }
+.btn-icone:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--marca-anel); }
+.dash-barra { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 0 4px; }
+
+.segmento { display: inline-flex; padding: 3px; gap: 2px; border-radius: 12px; background: var(--afundado); border: 1px solid var(--borda); max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.segmento button {
+  display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border: none; border-radius: 9px; flex: none; white-space: nowrap;
+  background: none; color: var(--texto-3); font-size: 12.5px; font-weight: 600; transition: background var(--t), color var(--t);
+}
+.segmento button:hover { color: var(--texto); }
+.segmento button.on { background: rgba(255, 255, 255, 0.1); color: var(--texto); }
+[data-tema='claro'] .segmento button.on { background: #fff; box-shadow: 0 1px 3px rgba(42, 41, 42, 0.1); }
+
+/* filtro quieto até ser usado: sem caixa; ligado ganha a cor da casa */
+.seletor-rotulo {
+  display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; border-radius: 9px; max-width: 240px;
+  border: 1px solid transparent; background: none; font-size: 12.5px; font-weight: 500; color: var(--texto-2);
+}
+.seletor-rotulo:hover { background: var(--sup-hover); color: var(--texto); }
+.seletor-rotulo.on { border-color: var(--borda); background: var(--marca-suave); color: var(--marca-texto); }
+.seletor-rotulo.aberto { border-color: var(--marca); box-shadow: 0 0 0 4px var(--marca-anel); background: none; }
+.seletor-rotulo:focus-visible { outline: none; border-color: var(--marca); box-shadow: 0 0 0 4px var(--marca-anel); }
+.seletor-rotulo svg { color: var(--texto-4); transition: transform var(--t); flex: none; }
+.seletor-rotulo.aberto svg { transform: rotate(180deg); }
+.seletor-rotulo span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.menu {
+  position: fixed; z-index: 80; min-width: 220px; padding: 6px; border-radius: 12px;
+  background: var(--opaco); border: 1px solid var(--borda); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+[data-tema='claro'] .menu { background: #fff; box-shadow: 0 16px 40px rgba(34, 56, 93, 0.14); }
+.menu button {
+  display: grid; grid-template-columns: 1fr auto 16px; align-items: center; gap: 10px; width: 100%;
+  padding: 7px 10px; border: none; border-radius: 8px; background: none; text-align: left; font-size: 13px; color: var(--texto-2);
+}
+.menu button:hover, .menu button.foco { background: var(--sup-hover); color: var(--texto); }
+.menu button .n { font-size: 12px; color: var(--texto-4); font-variant-numeric: tabular-nums; }
+.menu button .ok { color: var(--marca-texto); }
+.menu hr { border: none; border-top: 1px solid var(--borda-fraca); margin: 4px 2px; }
+
+/* ---------------------------------------------------------------- indicadores: uma faixa, divisórias finas */
+.dash-kpis {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--painel); border: 1px solid var(--borda); border-radius: 14px;
+}
+.dash-kpi { display: flex; flex-direction: column; gap: 4px; padding: 16px 20px 18px; min-width: 0; }
+.dash-kpi + .dash-kpi { border-left: 1px solid var(--borda-fraca); }
+.dash-kpi-rotulo { font-size: 12.5px; font-weight: 500; color: var(--texto-3); }
+.dash-kpi > b { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: var(--texto-forte); }
+.dash-kpi-sub { font-size: 12px; line-height: 1.4; color: var(--texto-3); }
+.maturando { color: var(--alerta); }
+
+/* ---------------------------------------------------------------- seções */
+.dash-secao {
+  display: flex; flex-direction: column; gap: 14px; min-width: 0; padding: 18px 20px 20px;
+  background: var(--painel); border: 1px solid var(--borda); border-radius: 14px;
+}
+.dash-secao-topo { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; min-height: 30px; }
+.dash-secao-topo h2 { flex: 1 1 auto; font-size: 15px; letter-spacing: -0.01em; }
+.dash-duas { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; }
+
+.dash-mini { display: flex; flex-wrap: wrap; gap: 10px 36px; }
+.dash-mini > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dash-mini-rotulo { font-size: 12px; font-weight: 500; color: var(--texto-3); }
+.dash-mini b { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; color: var(--texto-forte); }
+.dash-mini b small { font-size: 12.5px; font-weight: 500; color: var(--texto-3); letter-spacing: 0; }
+.dash-mini-sub { font-size: 12px; color: var(--texto-3); }
+.dash-tempos { flex-direction: column; gap: 16px; }
+
+.dash-legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--texto-2); }
+.dash-legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.dash-legenda i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+
+/* ---------------------------------------------------------------- funil: barras horizontais */
+.dash-hbarras { display: flex; flex-direction: column; gap: 2px; }
+.dash-hbarra {
+  display: grid; grid-template-columns: minmax(110px, 170px) minmax(0, 1fr) 56px 52px; align-items: center; gap: 12px;
+  padding: 5px 6px; margin: 0 -6px; border-radius: 8px;
+}
+.dash-hbarra:hover { background: var(--sup); }
+.dash-hbarra-rotulo { font-size: 13px; color: var(--texto-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-hbarra-trilho { height: 14px; background: var(--trilho); border-radius: 0 4px 4px 0; }
+.dash-hbarra-trilho i { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--serie-1); transition: width var(--t); }
+.dash-num { font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600; text-align: right; color: var(--texto); }
+.dash-hbarra-pct { font-size: 12px; color: var(--texto-3); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- semanas: colunas empilhadas */
+.dash-colunas-caixa { display: flex; flex-direction: column; gap: 6px; position: relative; }
+.dash-colunas { display: grid; grid-template-columns: repeat(var(--n), minmax(6px, 1fr)); gap: 2px; }
+/* a escala fica numa calha à direita, fora das colunas */
+.dash-colunas { padding-right: 32px; }
+.dash-colunas.plot { height: 180px; align-items: end; border-bottom: 1px solid var(--borda-fraca); position: relative; }
+.dash-grade { position: absolute; left: 0; right: 32px; border-top: 1px solid var(--borda-fraca); pointer-events: none; }
+.dash-grade span { position: absolute; left: calc(100% + 6px); top: -6px; font-size: 10.5px; line-height: 1; color: var(--texto-4); font-variant-numeric: tabular-nums; }
+.dash-coluna { height: 100%; display: flex; align-items: flex-end; justify-content: center; border-radius: 4px 4px 0 0; position: relative; }
+.dash-coluna:hover { background: var(--sup); }
+.dash-coluna-pilha { display: flex; flex-direction: column-reverse; gap: 2px; width: min(22px, 70%); min-height: 0; }
+.dash-coluna-pilha i { display: block; min-height: 2px; }
+.dash-coluna-pilha i:last-child { border-radius: 4px 4px 0 0; }
+.dash-coluna.maturando-col .dash-coluna-pilha { opacity: 0.5; }
+.dash-colunas.eixo span { font-size: 10.5px; color: var(--texto-4); text-align: center; white-space: nowrap; overflow: visible; font-variant-numeric: tabular-nums; }
+.dash-marca-mat { position: absolute; top: 0; bottom: 0; border-left: 1px dashed var(--borda-hover); pointer-events: none; }
+.dash-marca-mat span { position: absolute; top: 0; left: 6px; font-size: 11px; color: var(--texto-3); white-space: nowrap; }
+
+/* ---------------------------------------------------------------- tabelas */
+.tabela-rolagem { overflow-x: auto; margin: 0 -4px; }
+.tabela { width: 100%; border-collapse: collapse; }
+.tabela th, .tabela td { padding: 8px 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tabela th { text-align: left; font-size: 12px; font-weight: 500; color: var(--texto-3); border-bottom: 1px solid var(--borda); white-space: normal; }
+.tabela td { font-size: 13px; border-bottom: 1px solid var(--borda-fraca); }
+.tabela th:not(:first-child), .tabela td:not(:first-child) { text-align: right; }
+.tabela td:first-child { min-width: 130px; color: var(--texto); }
+.tabela tbody tr { cursor: pointer; transition: background var(--t); }
+.tabela tbody tr:hover { background: var(--sup); }
+.tabela tbody tr.on td { background: var(--marca-suave); }
+.tabela tbody tr.on td:first-child { font-weight: 600; }
+.tabela tfoot td { font-weight: 600; border-top: 1px solid var(--borda); border-bottom: none; }
+.tabela .pct-n { font-size: 11.5px; color: var(--texto-4); margin-left: 4px; }
+.dash-tabela-ver summary { font-size: 12.5px; color: var(--texto-3); cursor: pointer; width: fit-content; }
+.dash-tabela-ver summary:hover { color: var(--texto); }
+.dash-tabela-ver[open] summary { margin-bottom: 8px; }
+
+/* ---------------------------------------------------------------- dica dos gráficos e o "i" */
+.dash-tip {
+  position: fixed; z-index: 95; pointer-events: none; min-width: 170px; max-width: 280px; padding: 8px 10px;
+  border-radius: 10px; background: var(--opaco); border: 1px solid var(--borda);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35); font-size: 12px; color: var(--texto-2); display: none;
+}
+[data-tema='claro'] .dash-tip { background: #fff; box-shadow: 0 10px 28px rgba(34, 56, 93, 0.14); }
+.dash-tip-titulo { font-size: 11.5px; color: var(--texto-3); margin-bottom: 4px; }
+.dash-tip-linha { display: grid; grid-template-columns: 10px auto 1fr; align-items: center; gap: 8px; line-height: 1.7; }
+.dash-tip-linha i { width: 10px; height: 10px; border-radius: 2px; }
+.dash-tip-linha b { color: var(--texto-forte); font-weight: 600; font-variant-numeric: tabular-nums; }
+.dash-tip-linha span { color: var(--texto-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-tip-nota { margin-top: 4px; color: var(--texto-3); }
+
+.com-dica { display: inline-flex; align-items: center; gap: 4px; }
+.dica-botao {
+  display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none; padding: 0;
+  border: none; border-radius: 50%; background: none; color: var(--texto-4); cursor: help; transition: color var(--t), background var(--t);
+}
+.dica-botao:hover, .dica-botao.on, .dica-botao:focus-visible { color: var(--marca-texto); background: var(--marca-suave); outline: none; }
+.dica-balao {
+  position: fixed; z-index: 90; max-width: 320px; padding: 10px 12px; border-radius: 12px; font-size: 12.5px; line-height: 1.5;
+  color: var(--texto-2); background: rgba(16, 16, 16, 0.98); border: 1px solid var(--borda); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+}
+[data-tema='claro'] .dica-balao { background: #fff; box-shadow: 0 16px 40px rgba(34, 56, 93, 0.14); }
+.dica-balao p { margin: 0; }
+.dica-balao p + p { margin-top: 6px; }
+
+/* ---------------------------------------------------------------- celular */
+@media (max-width: 960px) {
+  .dash-duas { grid-template-columns: 1fr; }
+}
+@media (max-width: 900px) {
+  .dash-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dash-kpi:nth-child(3) { border-left: none; }
+  .dash-kpi:nth-child(n + 3) { border-top: 1px solid var(--borda-fraca); }
+}
+@media (max-width: 720px) {
+  .tela { padding: 8px 16px 32px; }
+  .dash-nav { flex-wrap: wrap; row-gap: 0; padding-top: 4px; }
+  .dash-nav h1 { font-size: 18px; }
+  .dash-atualizado { display: none; }
+  .dash-secao { padding: 14px 14px 16px; }
+  .dash-kpi { padding: 12px 14px 14px; }
+  .dash-kpi > b { font-size: 24px; }
+  .dash-hbarra { grid-template-columns: 104px minmax(0, 1fr) 36px 46px; gap: 8px; }
+  .dash-colunas.eixo span:nth-child(even) { visibility: hidden; }
+}
+</style>
+</head>
+<body>
+<main class="tela">
+  <div class="dash-topo">
+    <nav class="dash-nav">
+      <h1>Funil comercial</h1>
+      <span class="dash-cliente">NossoLarMed</span>
+      <span class="espaco"></span>
+      <span class="dash-atualizado" id="atualizado"></span>
+      <button class="btn-icone" id="tema" type="button" aria-label="Trocar tema"></button>
+    </nav>
+    <div class="dash-barra">
+      <div class="segmento" id="periodo" role="tablist" aria-label="Período"></div>
+      <button class="seletor-rotulo" id="origem" type="button" aria-haspopup="listbox"></button>
+    </div>
+  </div>
+
+  <section class="dash-kpis" id="kpis" aria-label="Indicadores"></section>
+
+  <div class="dash-duas">
+    <section class="dash-secao">
+      <div class="dash-secao-topo"><h2 class="com-dica">Funil<span data-dica="funil"></span></h2></div>
+      <div class="dash-hbarras" id="funil"></div>
+      <div class="dash-mini" id="valores"></div>
+    </section>
+    <section class="dash-secao">
+      <div class="dash-secao-topo"><h2 class="com-dica">Tempo até cada passo<span data-dica="tempos"></span></h2></div>
+      <div class="dash-mini dash-tempos" id="tempos"></div>
+    </section>
+  </div>
+
+  <section class="dash-secao">
+    <div class="dash-secao-topo"><h2 class="com-dica">Até onde o lead chegou, por semana<span data-dica="semanas"></span></h2></div>
+    <div class="dash-legenda" id="legenda"></div>
+    <div class="dash-colunas-caixa" id="semanas"></div>
+    <details class="dash-tabela-ver"><summary>Ver em tabela</summary><div class="tabela-rolagem" id="semanas-tabela"></div></details>
+  </section>
+
+  <section class="dash-secao">
+    <div class="dash-secao-topo"><h2 class="com-dica">Por origem<span data-dica="origem"></span></h2></div>
+    <div class="tabela-rolagem" id="origens"></div>
+  </section>
+</main>
+<div class="dash-tip" id="tip" role="tooltip"></div>
+
+<script src="dados.js"></script>
+<script>
+(() => {
+  const D = window.FUNIL;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  // ------------------------------------------------------------ formato
+  const nf = new Intl.NumberFormat('pt-BR');
+  const n = (x) => nf.format(x);
+  const pct = (a, b, casas = 1) => (b ? (100 * a / b).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }) : '—') + (b ? '%' : '');
+  const reais = (x) => 'R$ ' + nf.format(Math.round(x));
+  const reaisCurto = (x) => x >= 1e6 ? 'R$ ' + (x / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi'
+    : x >= 1e4 ? 'R$ ' + nf.format(Math.round(x / 1e3)) + ' mil' : reais(x);
+  const dias = (d) => d == null ? '—' : d < 1 ? Math.max(1, Math.round(d * 24)) + ' h'
+    : d.toLocaleString('pt-BR', { maximumFractionDigits: d < 10 ? 1 : 0 }) + (d < 2 ? ' dia' : ' dias');
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const nomeMes = (m) => { const s = MESES[+m.slice(5, 7) - 1]; return s[0].toUpperCase() + s.slice(1); };
+  const ddmm = (iso) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+
+  // ------------------------------------------------------------ estado (lembrado neste navegador)
+  const CHAVE = 'nossolarmed:funil';
+  let estado = { periodo: 'todos', origem: 'todas' };
+  try { Object.assign(estado, JSON.parse(localStorage.getItem(CHAVE) || '{}')); } catch (e) {}
+  if (!D.cubo[estado.periodo]) estado.periodo = 'todos';
+  if (!D.cubo.todos[estado.origem]) estado.origem = 'todas';
+  const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(estado)); } catch (e) {} };
+  const nomeOrigem = (id) => id === 'todas' ? 'Todas as origens' : D.origens.find((o) => o.id === id).nome;
+
+  // A coorte está em maturação quando há lead com menos de 30 dias desde a extração.
+  const corte = new Date(Date.parse(D.extraidoEm) - D.maturacaoDias * 864e5).toISOString().slice(0, 7);
+  const periodoMaturando = (p) => p !== 'todos' && p >= corte;
+
+  // ------------------------------------------------------------ dicas ("i")
+  const DICAS = {
+    funil: ['Leads criados no Kommo no período (sem o funil Contatos). O que aconteceu depois vem do Clinicorp, casado pelo telefone.',
+      'Quem recebeu orçamento conta como compareceu, porque cerca de 25% das consultas ficam sem status na agenda.',
+      'Orçamentos de R$ 0 e o lote importado em 27/07 ficam de fora.'],
+    tempos: ['Medianas, só entre os leads que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
+    semanas: ['Cada coluna é a semana em que o lead chegou; a cor diz até onde ele foi.',
+      `Semanas dos últimos ${D.maturacaoDias} dias ainda estão em maturação: parte desses leads ainda vai agendar ou aprovar.`],
+    origem: ['Origem pela etiqueta do Kommo. Lead com mais de uma etiqueta conta numa só, na ordem da tabela.',
+      'Clique numa linha para filtrar a página por ela.'],
+  };
+  const ICONE_I = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 7.5v.01"/></svg>';
+  let balao = null;
+  function fecharDica() { if (balao) { balao.remove(); balao = null; document.querySelectorAll('.dica-botao.on').forEach((b) => b.classList.remove('on')); } }
+  function abrirDica(btn) {
+    fecharDica();
+    balao = document.createElement('div'); balao.className = 'dica-balao'; balao.setAttribute('role', 'tooltip');
+    balao.innerHTML = DICAS[btn.dataset.chave].map((p) => `<p>${esc(p)}</p>`).join('');
+    document.body.appendChild(balao); btn.classList.add('on');
+    const r = btn.getBoundingClientRect(), w = balao.offsetWidth, h = balao.offsetHeight;
+    balao.style.left = Math.max(8, Math.min(r.left - 12, innerWidth - w - 8)) + 'px';
+    balao.style.top = (r.bottom + 8 + h > innerHeight ? r.top - h - 8 : r.bottom + 8) + 'px';
+  }
+  document.querySelectorAll('[data-dica]').forEach((s) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'dica-botao'; b.dataset.chave = s.dataset.dica; b.setAttribute('aria-label', 'Sobre este quadro');
+    b.innerHTML = ICONE_I;
+    b.addEventListener('mouseenter', () => abrirDica(b));
+    b.addEventListener('mouseleave', fecharDica);
+    b.addEventListener('focus', () => abrirDica(b));
+    b.addEventListener('blur', fecharDica);
+    b.addEventListener('click', (e) => { e.stopPropagation(); b.classList.contains('on') ? fecharDica() : abrirDica(b); });
+    s.replaceWith(b);
+  });
+  addEventListener('scroll', fecharDica, { passive: true });
+
+  // ------------------------------------------------------------ dica que segue o ponteiro
+  const tip = $('tip');
+  function mostrarTip(e, html) {
+    tip.innerHTML = html; tip.style.display = 'block';
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    let x = e.clientX + 14, y = e.clientY + 14;
+    if (x + w > innerWidth - 8) x = e.clientX - w - 14;
+    if (y + h > innerHeight - 8) y = e.clientY - h - 14;
+    tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, y) + 'px';
+  }
+  const esconderTip = () => { tip.style.display = 'none'; };
+  const linhaTip = (cor, valor, rotulo) => `<div class="dash-tip-linha"><i style="background:${cor}"></i><b>${valor}</b><span>${esc(rotulo)}</span></div>`;
+  // Um ouvinte só para a página toda: cada alvo guarda o html da dica em data-tip.
+  document.addEventListener('pointermove', (e) => {
+    const alvo = e.target.closest && e.target.closest('[data-tip]');
+    if (alvo && e.pointerType !== 'touch') mostrarTip(e, alvo.dataset.tip); else esconderTip();
+  });
+  document.addEventListener('pointerleave', esconderTip);
+
+  // ------------------------------------------------------------ tema
+  const SOL = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg>';
+  const LUA = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>';
+  const claro = () => document.documentElement.getAttribute('data-tema') === 'claro';
+  function pintarBotaoTema() { $('tema').innerHTML = claro() ? LUA : SOL; $('tema').title = claro() ? 'Tema escuro' : 'Tema claro'; }
+  $('tema').addEventListener('click', () => {
+    const vaiClaro = !claro();
+    if (vaiClaro) document.documentElement.setAttribute('data-tema', 'claro'); else document.documentElement.removeAttribute('data-tema');
+    document.querySelector('meta[name=theme-color]').content = vaiClaro ? '#efebe5' : '#050505';
+    document.querySelector('meta[name=color-scheme]').content = vaiClaro ? 'light' : 'dark';
+    try { localStorage.setItem('aspekto:tema', vaiClaro ? 'claro' : 'escuro'); } catch (e) {}
+    pintarBotaoTema();
+  });
+  pintarBotaoTema();
+
+  // ------------------------------------------------------------ filtros
+  function desenharPeriodo() {
+    const ps = ['todos', ...D.meses];
+    $('periodo').innerHTML = ps.map((p) => `<button type="button" role="tab" data-p="${p}" class="${p === estado.periodo ? 'on' : ''}" aria-selected="${p === estado.periodo}">${p === 'todos' ? 'Tudo' : nomeMes(p)}</button>`).join('');
+  }
+  $('periodo').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    estado.periodo = b.dataset.p; salvar(); desenhar();
+  });
+
+  const SETA = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+  const OK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  let menu = null;
+  function fecharMenu() { if (menu) { menu.remove(); menu = null; $('origem').classList.remove('aberto'); $('origem').setAttribute('aria-expanded', 'false'); } }
+  function desenharOrigem() {
+    const b = $('origem');
+    b.className = 'seletor-rotulo' + (estado.origem !== 'todas' ? ' on' : '');
+    b.innerHTML = `<span>${esc(estado.origem === 'todas' ? 'Origem' : nomeOrigem(estado.origem))}</span>${SETA}`;
+  }
+  function abrirMenu() {
+    const b = $('origem');
+    menu = document.createElement('div'); menu.className = 'menu'; menu.setAttribute('role', 'listbox');
+    const c = D.cubo[estado.periodo];
+    const item = (id) => `<button type="button" role="option" data-o="${id}" aria-selected="${id === estado.origem}"><span>${esc(nomeOrigem(id))}</span><span class="n">${n(c[id].leads)}</span><span class="ok">${id === estado.origem ? OK : ''}</span></button>`;
+    menu.innerHTML = item('todas') + '<hr>' + D.origens.map((o) => item(o.id)).join('');
+    document.body.appendChild(menu);
+    const r = b.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + 'px';
+    menu.style.top = r.bottom + 6 + 'px';
+    b.classList.add('aberto'); b.setAttribute('aria-expanded', 'true');
+    const itens = [...menu.querySelectorAll('button')];
+    let i = Math.max(0, itens.findIndex((x) => x.dataset.o === estado.origem));
+    const focar = () => { itens.forEach((x, j) => x.classList.toggle('foco', j === i)); itens[i].focus(); };
+    focar();
+    menu.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown') { i = (i + 1) % itens.length; focar(); e.preventDefault(); }
+      else if (e.key === 'ArrowUp') { i = (i - 1 + itens.length) % itens.length; focar(); e.preventDefault(); }
+      else if (e.key === 'Escape') { fecharMenu(); b.focus(); }
+    });
+    menu.addEventListener('click', (e) => {
+      const x = e.target.closest('button'); if (!x) return;
+      escolherOrigem(x.dataset.o); fecharMenu(); b.focus();
+    });
+  }
+  function escolherOrigem(id) { estado.origem = id; salvar(); desenhar(); }
+  $('origem').addEventListener('click', (e) => { e.stopPropagation(); menu ? fecharMenu() : abrirMenu(); });
+  document.addEventListener('click', (e) => { if (menu && !menu.contains(e.target)) fecharMenu(); fecharDica(); });
+  addEventListener('resize', fecharMenu);
+
+  // ------------------------------------------------------------ indicadores
+  function desenharKpis(r) {
+    const mat = periodoMaturando(estado.periodo);
+    const kpi = (rotulo, valor, sub) => `<div class="dash-kpi"><span class="dash-kpi-rotulo">${rotulo}</span><b>${valor}</b><span class="dash-kpi-sub">${sub}</span></div>`;
+    $('kpis').innerHTML =
+      kpi('Leads', n(r.leads), estado.origem === 'todas' ? 'criados no Kommo' : esc(nomeOrigem(estado.origem))) +
+      kpi('Agendaram', pct(r.agendou, r.leads), `${n(r.agendou)} leads`) +
+      kpi('Compareceram', pct(r.veio, r.agendou), `dos agendados · ${n(r.veio)} leads`) +
+      kpi('Aprovaram', pct(r.aprovou, r.leads), `${n(r.aprovou)} leads · ${reaisCurto(r.aprovado)}` + (mat ? ' · <span class="maturando">em maturação</span>' : ''));
+  }
+
+  // ------------------------------------------------------------ funil
+  function desenharFunil(r) {
+    const passos = [['Leads', r.leads], ['Agendaram', r.agendou], ['Compareceram', r.veio], ['Com orçamento', r.orcou], ['Aprovaram', r.aprovou]];
+    const cor = getComputedStyle(document.documentElement).getPropertyValue('--serie-1').trim();
+    $('funil').innerHTML = passos.map(([rot, v], i) => {
+      const ant = i ? passos[i - 1] : null;
+      const t = `<div class="dash-tip-titulo">${rot}</div>` + linhaTip(cor, n(v), 'leads') +
+        `<div class="dash-tip-nota">${pct(v, r.leads)} dos leads${ant ? ` · ${pct(v, ant[1])} de “${ant[0].toLowerCase()}”` : ''}</div>`;
+      return `<div class="dash-hbarra" data-tip="${esc(t)}"><span class="dash-hbarra-rotulo">${rot}</span>
+        <span class="dash-hbarra-trilho"><i style="width:${r.leads ? (100 * v / r.leads) : 0}%"></i></span>
+        <span class="dash-num">${n(v)}</span><span class="dash-hbarra-pct">${pct(v, r.leads)}</span></div>`;
+    }).join('');
+    const ticket = r.aprovou ? r.aprovado / r.aprovou : 0;
+    $('valores').innerHTML =
+      `<div><span class="dash-mini-rotulo">Orçado</span><b>${reaisCurto(r.orcado)}</b></div>` +
+      `<div><span class="dash-mini-rotulo">Aprovado</span><b>${reaisCurto(r.aprovado)} <small>${pct(r.aprovado, r.orcado, 0)} do orçado</small></b></div>` +
+      `<div><span class="dash-mini-rotulo">Ticket aprovado</span><b>${r.aprovou ? reais(ticket) : '—'}</b></div>` +
+      `<div><span class="dash-mini-rotulo">Faltaram sem voltar</span><b>${n(r.faltou)} <small>${pct(r.faltou, r.agendou, 0)} dos agendados</small></b></div>`;
+  }
+
+  // ------------------------------------------------------------ tempos
+  function desenharTempos(r) {
+    const t = r.tempos;
+    const linha = (rot, v, sub) => `<div><span class="dash-mini-rotulo">${rot}</span><b>${v}</b>${sub ? `<span class="dash-mini-sub">${sub}</span>` : ''}</div>`;
+    $('tempos').innerHTML =
+      linha('Do lead ao agendamento', dias(t.leadAgenda)) +
+      linha('Do agendamento à consulta', dias(t.agendaConsulta)) +
+      linha('Do lead à aprovação', dias(t.leadAprovacao), t.leadAprovacaoP80 != null ? `80% aprovam em até ${dias(t.leadAprovacaoP80)}` : '');
+  }
+
+  // ------------------------------------------------------------ semanas
+  const PASSOS = [['aprovou', 'Aprovou', '--passo-aprovou'], ['veio', 'Compareceu, sem aprovar', '--passo-veio'],
+    ['agendou', 'Agendou, sem comparecer', '--passo-agendou'], ['nao', 'Não agendou', '--passo-nao']];
+  function desenharSemanas() {
+    const css = getComputedStyle(document.documentElement);
+    const cores = Object.fromEntries(PASSOS.map(([k, , v]) => [k, css.getPropertyValue(v).trim()]));
+    $('legenda').innerHTML = PASSOS.map(([k, rot]) => `<span><i style="background:${cores[k]}"></i>${rot}</span>`).join('');
+    const todas = D.porSemana[estado.origem];
+    const ss = estado.periodo === 'todos' ? todas : todas.filter((s) => s.mes === estado.periodo);
+    const max = Math.max(1, ...ss.map((s) => s.leads));
+    // três ou quatro linhas de grade, em passo redondo (1, 2 ou 5 × 10^k)
+    const bruto = max / 4, ordem = 10 ** Math.floor(Math.log10(bruto)), f = bruto / ordem;
+    const passo = Math.max(1, (f > 5 ? 10 : f > 2 ? 5 : f > 1 ? 2 : 1) * ordem);
+    const grades = []; for (let v = passo; v <= max; v += passo) grades.push(v);
+    const colunas = ss.map((s) => {
+      const fim = new Date(Date.parse(s.semana + 'T12:00:00Z') + 6 * 864e5).toISOString().slice(0, 10);
+      const t = `<div class="dash-tip-titulo">Semana de ${ddmm(s.semana)} a ${ddmm(fim)}</div>` +
+        PASSOS.map(([k, rot]) => linhaTip(cores[k], `${n(s[k])} <span class="sutil">${pct(s[k], s.leads, 0)}</span>`, rot)).join('') +
+        `<div class="dash-tip-nota">${n(s.leads)} leads${s.maturando ? ' · em maturação' : ''}</div>`;
+      // cada parte cresce na proporção da contagem; o vão de 2px entre elas sai do espaço, não soma altura
+      const partes = PASSOS.map(([k]) => s[k] ? `<i style="flex:${s[k]} 1 0;background:${cores[k]}"></i>` : '').join('');
+      return `<div class="dash-coluna${s.maturando ? ' maturando-col' : ''}" data-tip="${esc(t)}"><div class="dash-coluna-pilha" style="height:${(100 * s.leads / max).toFixed(2)}%">${partes}</div></div>`;
+    }).join('');
+    const iMat = ss.findIndex((s) => s.maturando);
+    const marca = iMat > 0 ? `<div class="dash-marca-mat" style="left:calc((100% - 32px) * ${(iMat / ss.length).toFixed(4)} - 1px)"><span>em maturação</span></div>` : '';
+    $('semanas').innerHTML =
+      `<div class="dash-colunas plot" style="--n:${ss.length}">${grades.map((v) => `<div class="dash-grade" style="bottom:${(100 * v / max).toFixed(2)}%"><span>${v}</span></div>`).join('')}${colunas}${marca}</div>` +
+      `<div class="dash-colunas eixo" style="--n:${ss.length}">${ss.map((s) => `<span>${ddmm(s.semana)}</span>`).join('')}</div>`;
+    $('semanas-tabela').innerHTML = `<table class="tabela"><thead><tr><th>Semana</th><th>Leads</th>${PASSOS.map(([, rot]) => `<th>${rot}</th>`).join('')}</tr></thead><tbody>` +
+      ss.map((s) => `<tr><td>${ddmm(s.semana)}${s.maturando ? ' <span class="sutil">em maturação</span>' : ''}</td><td>${n(s.leads)}</td>${PASSOS.map(([k]) => `<td>${n(s[k])}<span class="pct-n">${pct(s[k], s.leads, 0)}</span></td>`).join('')}</tr>`).join('') +
+      '</tbody></table>';
+  }
+
+  // ------------------------------------------------------------ por origem
+  function desenharOrigens() {
+    const linhas = D.porOrigem[estado.periodo];
+    const tot = D.cubo[estado.periodo].todas;
+    const celula = (a, b) => `${pct(a, b)}<span class="pct-n">${n(a)}</span>`;
+    const tr = (r, nome, cls, attr) => `<tr class="${cls}" ${attr}><td>${esc(nome)}</td><td>${n(r.leads)}</td><td>${celula(r.agendou, r.leads)}</td>` +
+      `<td>${celula(r.veio, r.agendou)}</td><td>${celula(r.aprovou, r.leads)}</td><td>${reais(r.aprovado)}</td><td>${r.leads ? reais(r.aprovado / r.leads) : '—'}</td></tr>`;
+    $('origens').innerHTML = `<table class="tabela"><thead><tr><th>Origem</th><th>Leads</th><th>Agendaram</th><th>Compareceram<br><span class="sutil">dos agendados</span></th><th>Aprovaram</th><th>Aprovado</th><th>Aprovado por lead</th></tr></thead><tbody>` +
+      linhas.map((r) => tr(r, nomeOrigem(r.id), r.id === estado.origem ? 'on' : '', `data-o="${r.id}" tabindex="0"`)).join('') +
+      `</tbody><tfoot>${tr(tot, 'Total', '', '')}</tfoot></table>`;
+  }
+  $('origens').addEventListener('click', (e) => {
+    const r = e.target.closest('tbody tr'); if (!r) return;
+    escolherOrigem(r.dataset.o === estado.origem ? 'todas' : r.dataset.o);
+  });
+  $('origens').addEventListener('keydown', (e) => {
+    const r = e.target.closest('tbody tr'); if (!r || (e.key !== 'Enter' && e.key !== ' ')) return;
+    e.preventDefault(); escolherOrigem(r.dataset.o === estado.origem ? 'todas' : r.dataset.o);
+  });
+
+  // ------------------------------------------------------------ tudo
+  function desenhar() {
+    const r = D.cubo[estado.periodo][estado.origem];
+    desenharPeriodo(); desenharOrigem(); desenharKpis(r); desenharFunil(r); desenharTempos(r); desenharSemanas(); desenharOrigens();
+  }
+  const ext = new Date(D.extraidoEm);
+  $('atualizado').textContent = 'Dados de ' + ext.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' +
+    ext.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+  desenhar();
+  // as cores das barras vêm dos tokens: trocar o tema redesenha
+  new MutationObserver(desenhar).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
+})();
+</script>
+</body>
+</html>
