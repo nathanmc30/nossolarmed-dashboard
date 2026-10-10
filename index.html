@@ -387,13 +387,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const DICAS = {
     funil: ['Leads criados no Kommo no período (sem o funil Contatos). O que aconteceu depois vem do Clinicorp, casado pelo telefone.',
       'Cada etapa conta o que aconteceu no período, pela data do fato, mesmo que não sejam as mesmas pessoas: avaliações marcadas (dia em que a recepção marcou), comparecidas (dia da consulta), orçamentos emitidos e aprovados (dia de cada um).',
-      'Avaliação = categoria "Avaliação …" ou "Urgência …" no Clinicorp; cancelada não conta. Orçamento e aprovação só de quem fez avaliação nos 120 dias anteriores. Orçamentos de R$ 0 e o lote de 27/07 ficam de fora.',
+      'Avaliação = só as categorias de anúncio no Clinicorp: Avaliação Meta, Avaliação Google e Urgência Google; cancelada não conta. Orçamento e aprovação só de quem fez avaliação nos 120 dias anteriores. Orçamentos de R$ 0 e o lote de 27/07 ficam de fora.',
       'Percentual de cada linha: agendaram ÷ leads; compareceram ÷ avaliações previstas no período; orçamento e aprovação ÷ comparecidas.'],
-    marcadas: ['Avaliações (categoria "Avaliação …" ou "Urgência …") marcadas no Clinicorp no período, pela data em que a recepção marcou. Conta todas, inclusive de quem chegou em dias anteriores ou não está no Kommo. Canceladas não contam.'],
+    marcadas: ['Avaliações Meta, Google e Urgência Google marcadas no Clinicorp no período, pela data em que a recepção marcou. Conta todas, inclusive de quem chegou em dias anteriores ou não está no Kommo. Canceladas não contam.'],
     agendaram: ['Avaliações marcadas no período ÷ leads que chegaram no período, mesmo que não sejam as mesmas pessoas (a avaliação de hoje pode ser de um lead de ontem).'],
     comparecimento: ['Avaliações atendidas no período ÷ avaliações que estavam marcadas para o período e já passaram (atendidas, faltas e sem status). Canceladas não entram.'],
     aprovacao: ['Orçamentos aprovados no período ÷ avaliações atendidas no período, mesmo que não sejam as mesmas pessoas.'],
-    casa: ['Orçamentos aprovados no período de quem não fez avaliação nos 120 dias anteriores: paciente da casa em tratamento. Fica fora do funil.'],
+    casa: ['Orçamentos aprovados no período de quem não fez avaliação Meta, Google ou Urgência Google nos 120 dias anteriores: paciente da casa em tratamento ou avaliação de outra origem (Indicação, Outdoor…).'],
     tempos: ['Medianas por lead (a única parte que segue cada pessoa), entre os leads do período que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
     semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
       () => `Leads dos últimos ${D.maturacaoDias} dias ainda estão em maturação: parte deles ainda vai agendar ou aprovar.`],
@@ -576,7 +576,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       `<div><span class="dash-mini-rotulo">Aprovado</span><b>${reaisCurto(e.aprovado.v)} <small>${e.orcamento.v ? pct(e.aprovado.v, e.orcamento.v, 0) + ' do orçado' : ''}</small></b></div>` +
       `<div><span class="dash-mini-rotulo">Ticket aprovado</span><b>${e.aprovado.q ? reais(ticket) : '—'}</b></div>` +
       `<div><span class="dash-mini-rotulo">Faltaram</span><b>${n(e.faltou.q)} <small>${e.prevista.q ? pct(e.faltou.q, e.prevista.q, 0) + ' das previstas' : ''}</small></b></div>` +
-      `<div><span class="dash-mini-rotulo com-dica">Pacientes da casa<span data-dica-local="casa"></span></span><b>${reaisCurto(e.casa.v)} <small>${plural(e.casa.q, 'aprovado', 'aprovados')}</small></b></div>`;
+      `<div><span class="dash-mini-rotulo com-dica">Aprovado fora do funil<span data-dica-local="casa"></span></span><b>${reaisCurto(e.casa.v)} <small>${plural(e.casa.q, 'aprovado', 'aprovados')}</small></b></div>`;
     ligarDicas($('valores'));
   }
 
