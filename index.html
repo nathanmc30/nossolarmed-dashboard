@@ -288,17 +288,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
     </section>
   </div>
 
-  <section class="dash-secao">
-    <div class="dash-secao-topo"><h2 class="com-dica"><span id="titulo-tempo">Até onde o lead chegou</span><span data-dica="semanas"></span></h2><span class="dash-estado" id="estado-tempo"></span></div>
-    <div class="dash-legenda" id="legenda"></div>
-    <div class="dash-colunas-caixa" id="semanas"></div>
-    <details class="dash-tabela-ver"><summary>Ver em tabela</summary><div class="tabela-rolagem" id="semanas-tabela"></div></details>
-  </section>
-
-  <section class="dash-secao">
-    <div class="dash-secao-topo"><h2 class="com-dica">Por origem<span data-dica="origem"></span></h2></div>
-    <div class="tabela-rolagem" id="origens"></div>
-  </section>
 </main>
 <div class="dash-tip" id="tip" role="tooltip"></div>
 
@@ -380,7 +369,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // ------------------------------------------------------------ dicas ("i")
   const DICAS = {
     funil: ['Leads criados no Kommo no período (sem o funil Contatos). O que aconteceu depois vem do Clinicorp, casado pelo telefone.',
-      'Quem recebeu orçamento conta como compareceu, porque cerca de 25% das consultas ficam sem status na agenda.',
+      'Agendaram: tem agendamento no Clinicorp que não foi cancelado. Compareceram: status Atendido ou Em atendimento, ou recebeu orçamento.',
       'Orçamentos de R$ 0 e o lote importado em 27/07 ficam de fora.'],
     tempos: ['Medianas, só entre os leads que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
     semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
@@ -636,11 +625,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
       D.origens.map((o) => tr(resumo(linhasDe(iv, o.id)), o.nome, o.id === estado.origem ? 'on' : '', `data-o="${o.id}" tabindex="0"`)).join('') +
       `</tbody><tfoot>${tr(tot, 'Total', '', '')}</tfoot></table>`;
   }
-  $('origens').addEventListener('click', (e) => {
+  if ($('origens')) $('origens').addEventListener('click', (e) => {
     const r = e.target.closest('tbody tr'); if (!r) return;
     escolherOrigem(r.dataset.o === estado.origem ? 'todas' : r.dataset.o);
   });
-  $('origens').addEventListener('keydown', (e) => {
+  if ($('origens')) $('origens').addEventListener('keydown', (e) => {
     const r = e.target.closest('tbody tr'); if (!r || (e.key !== 'Enter' && e.key !== ' ')) return;
     e.preventDefault(); escolherOrigem(r.dataset.o === estado.origem ? 'todas' : r.dataset.o);
   });
@@ -660,7 +649,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function desenhar() {
     const iv = intervalo();
     const r = resumo(linhasDe(iv, estado.origem));
-    desenharPeriodo(); desenharOrigem(); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharTempo(iv); desenharOrigens(iv); desenharAtualizado();
+    desenharPeriodo(); desenharOrigem(); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharAtualizado(); // gráfico no tempo e tabela por origem fora da tela por ora (pedido de 10/10)
     document.title = `Funil comercial · ${nomeIntervalo(iv)} · NossoLarMed`;
   }
   if (!D || !D.linhas) D = { linhas: [], origens: D?.origens || [], aguardandoAceite: [], maturacaoDias: 21, extraidoEm: new Date(0).toISOString(), primeiroDia: null };
