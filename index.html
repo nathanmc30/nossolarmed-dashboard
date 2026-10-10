@@ -273,6 +273,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
         <input type="date" id="de" aria-label="De"><span>até</span><input type="date" id="ate" aria-label="Até">
       </span>
       <button class="seletor-rotulo" id="origem" type="button" aria-haspopup="listbox"></button>
+      <button class="seletor-rotulo" id="avaliacao" type="button" aria-haspopup="listbox"></button>
     </div>
   </div>
 
@@ -323,7 +324,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   ];
 
   // ------------------------------------------------------------ estado: abre sempre em Hoje e todas as origens
-  const estado = { preset: 'hoje', de: hoje(), ate: hoje(), origem: 'todas' };
+  // avals: tipos de avaliação marcados no filtro (índices de D.avaliacoes); começa com todos
+  const estado = { preset: 'hoje', de: hoje(), ate: hoje(), origem: 'todas', avals: [0, 1, 2] };
   const nomeOrigem = (id) => id === 'todas' ? 'Todas as origens' : D.origens.find((o) => o.id === id).nome;
 
   function intervalo() {
@@ -372,9 +374,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function eventosNo([a, b]) {
     const oi = estado.origem === 'todas' ? null : D.origens.findIndex((o) => o.id === estado.origem);
     const t = {};
-    for (const [h, o, tipo, q, v] of D.eventos || []) {
+    for (const [h, o, tipo, q, v, av] of D.eventos || []) {
       const d = h.slice(0, 10);
       if (d < a || d > b || (oi != null && o !== oi)) continue;
+      if (tipo !== 'casa' && av != null && !estado.avals.includes(av)) continue; // filtro de avaliação
       const x = (t[tipo] ??= { q: 0, v: 0 }); x.q += q; x.v += v;
     }
     const z = (k) => t[k] || { q: 0, v: 0 };
@@ -389,7 +392,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       'Cada etapa conta o que aconteceu no período, pela data do fato, mesmo que não sejam as mesmas pessoas: avaliações marcadas (dia em que a recepção marcou), comparecidas (dia da consulta), orçamentos emitidos e aprovados (dia de cada um).',
       'Avaliação = só as categorias de anúncio no Clinicorp: Avaliação Meta, Avaliação Google e Urgência Google; cancelada não conta. Orçamento e aprovação só de quem fez avaliação nos 120 dias anteriores. Orçamentos de R$ 0 e o lote de 27/07 ficam de fora.',
       'Percentual de cada linha: agendaram ÷ leads; compareceram ÷ avaliações previstas no período; orçamento e aprovação ÷ comparecidas.'],
-    marcadas: ['Avaliações Meta, Google e Urgência Google marcadas no Clinicorp no período, pela data em que a recepção marcou. Conta todas, inclusive de quem chegou em dias anteriores ou não está no Kommo. Canceladas não contam.'],
+    marcadas: ['Avaliações (Meta, Google e Urgência Google, ou as escolhidas no filtro Avaliação) marcadas no Clinicorp no período, pela data em que a recepção marcou. Conta todas, inclusive de quem chegou em dias anteriores ou não está no Kommo. Canceladas não contam.'],
     agendaram: ['Avaliações marcadas no período ÷ leads que chegaram no período, mesmo que não sejam as mesmas pessoas (a avaliação de hoje pode ser de um lead de ontem).'],
     comparecimento: ['Avaliações atendidas no período ÷ avaliações que estavam marcadas para o período e já passaram (atendidas, faltas e sem status). Canceladas não entram.'],
     aprovacao: ['Orçamentos aprovados no período ÷ avaliações atendidas no período, mesmo que não sejam as mesmas pessoas.'],
@@ -491,7 +494,11 @@ button { font: inherit; color: inherit; cursor: pointer; }
   const SETA = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
   const OK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   let menu = null;
-  function fecharMenu() { if (menu) { menu.remove(); menu = null; $('origem').classList.remove('aberto'); $('origem').setAttribute('aria-expanded', 'false'); } }
+  function fecharMenu() {
+    if (!menu) return;
+    menu.remove(); menu = null;
+    for (const id of ['origem', 'avaliacao']) { $(id).classList.remove('aberto'); $(id).setAttribute('aria-expanded', 'false'); }
+  }
   function desenharOrigem() {
     const b = $('origem');
     b.className = 'seletor-rotulo' + (estado.origem !== 'todas' ? ' on' : '');
@@ -499,7 +506,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   }
   function abrirMenu() {
     const b = $('origem');
-    menu = document.createElement('div'); menu.className = 'menu'; menu.setAttribute('role', 'listbox');
+    menu = document.createElement('div'); menu.className = 'menu'; menu.dataset.de = 'origem'; menu.setAttribute('role', 'listbox');
     const iv = intervalo();
     const item = (id) => `<button type="button" role="option" data-o="${id}" aria-selected="${id === estado.origem}"><span>${esc(nomeOrigem(id))}</span><span class="n">${n(resumo(linhasDe(iv, id)).leads)}</span><span class="ok">${id === estado.origem ? OK : ''}</span></button>`;
     menu.innerHTML = item('todas') + '<hr>' + D.origens.map((o) => item(o.id)).join('');
@@ -523,7 +530,49 @@ button { font: inherit; color: inherit; cursor: pointer; }
     });
   }
   function escolherOrigem(id) { estado.origem = id; desenhar(); }
-  $('origem').addEventListener('click', (e) => { e.stopPropagation(); menu ? fecharMenu() : abrirMenu(); });
+  $('origem').addEventListener('click', (e) => { e.stopPropagation(); const era = menu?.dataset.de; fecharMenu(); if (era !== 'origem') abrirMenu(); });
+
+  // ------------------------------------------------------------ filtros: tipo de avaliação (vários de uma vez)
+  const nomesAval = () => D.avaliacoes || ['Avaliação Meta', 'Avaliação Google', 'Urgência Google'];
+  const curtoAval = (nome) => nome.replace(/^Avaliação /, '');
+  function desenharAvaliacao() {
+    const b = $('avaliacao'), todos = estado.avals.length === nomesAval().length;
+    b.className = 'seletor-rotulo' + (todos ? '' : ' on');
+    const rot = todos ? 'Avaliação' : estado.avals.map((i) => curtoAval(nomesAval()[i])).join(', ');
+    b.innerHTML = `<span>${esc(rot)}</span>${SETA}`;
+  }
+  function abrirMenuAval() {
+    const b = $('avaliacao');
+    menu = document.createElement('div'); menu.className = 'menu'; menu.dataset.de = 'avaliacao'; menu.setAttribute('role', 'listbox'); menu.setAttribute('aria-multiselectable', 'true');
+    const pinta = () => {
+      const iv = intervalo(), salvo = estado.avals;
+      const conta = (i) => { estado.avals = [i]; const q = eventosNo(iv).marcada.q; estado.avals = salvo; return q; };
+      const todos = estado.avals.length === nomesAval().length;
+      menu.innerHTML = `<button type="button" data-a="todas" aria-selected="${todos}"><span>Todas</span><span class="n"></span><span class="ok">${todos ? OK : ''}</span></button><hr>` +
+        nomesAval().map((nome, i) => `<button type="button" role="option" data-a="${i}" aria-selected="${estado.avals.includes(i)}"><span>${esc(nome)}</span><span class="n">${n(conta(i))}</span><span class="ok">${estado.avals.includes(i) ? OK : ''}</span></button>`).join('');
+    };
+    pinta();
+    document.body.appendChild(menu);
+    const r = b.getBoundingClientRect();
+    menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + 'px';
+    menu.style.top = r.bottom + 6 + 'px';
+    b.classList.add('aberto'); b.setAttribute('aria-expanded', 'true');
+    // marcar não fecha o menu: dá para escolher mais de uma; o último marcado não sai (nunca fica vazio)
+    menu.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const x = e.target.closest('button'); if (!x) return;
+      if (x.dataset.a === 'todas') estado.avals = nomesAval().map((_, i) => i);
+      else {
+        const i = +x.dataset.a, tem = estado.avals.includes(i);
+        if (tem && estado.avals.length === 1) return;
+        estado.avals = tem ? estado.avals.filter((v) => v !== i) : [...estado.avals, i].sort();
+      }
+      desenhar(); pinta();
+    });
+    menu.addEventListener('keydown', (e) => { if (e.key === 'Escape') { fecharMenu(); b.focus(); } });
+    menu.querySelector('button')?.focus();
+  }
+  $('avaliacao').addEventListener('click', (e) => { e.stopPropagation(); const era = menu?.dataset.de; fecharMenu(); if (era !== 'avaliacao') abrirMenuAval(); });
   document.addEventListener('click', (e) => { if (menu && !menu.contains(e.target)) fecharMenu(); fecharDica(); });
   addEventListener('resize', fecharMenu);
 
@@ -689,7 +738,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function desenhar() {
     const iv = intervalo();
     const r = resumo(linhasDe(iv, estado.origem));
-    desenharPeriodo(); desenharOrigem(); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharAtualizado(); // gráfico no tempo e tabela por origem fora da tela por ora (pedido de 10/10)
+    desenharPeriodo(); desenharOrigem(); desenharAvaliacao(); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharAtualizado(); // gráfico no tempo e tabela por origem fora da tela por ora (pedido de 10/10)
     document.title = `Funil comercial · ${nomeIntervalo(iv)} · NossoLarMed`;
   }
   if (!D || !D.linhas) D = { linhas: [], origens: D?.origens || [], aguardandoAceite: [], maturacaoDias: 21, extraidoEm: new Date(0).toISOString(), primeiroDia: null };
