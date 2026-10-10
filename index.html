@@ -354,11 +354,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return D.linhas.filter((l) => { const d = l[0].slice(0, 10); return d >= a && d <= b && (oi < 0 || l[1] === oi); });
   }
   function resumo(ls) {
-    const r = { leads: 0, agendou: 0, veio: 0, orcou: 0, aprovou: 0, faltou: 0, orcado: 0, aprovado: 0 };
+    const r = { leads: 0, agendou: 0, veio: 0, orcou: 0, aprovou: 0, faltou: 0, orcado: 0, aprovado: 0, aprovouFora: 0, aprovadoFora: 0 };
     const t1 = [], t2 = [], t3 = [];
     for (const l of ls) {
       r.leads += l[2]; r.agendou += l[3]; r.veio += l[4]; r.orcou += l[5]; r.aprovou += l[6]; r.faltou += l[7]; r.orcado += l[8]; r.aprovado += l[9];
       t1.push(...l[10]); t2.push(...l[11]); t3.push(...l[12]);
+      r.aprovouFora += l[13] || 0; r.aprovadoFora += l[14] || 0;
     }
     r.tempos = { leadAgenda: quantil(t1, 0.5), agendaConsulta: quantil(t2, 0.5), leadAprovacao: quantil(t3, 0.5), leadAprovacaoP80: quantil(t3, 0.8) };
     return r;
@@ -369,8 +370,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   // ------------------------------------------------------------ dicas ("i")
   const DICAS = {
     funil: ['Leads criados no Kommo no período (sem o funil Contatos). O que aconteceu depois vem do Clinicorp, casado pelo telefone.',
-      'Agendaram: tem agendamento no Clinicorp que não foi cancelado. Compareceram: status Atendido ou Em atendimento, ou recebeu orçamento.',
+      'Agendaram: agendamento de avaliação (categoria "Avaliação …") não cancelado. Compareceram: avaliação Atendida ou Em atendimento, ou recebeu orçamento.',
+      'Orçamento e aprovação contam só para quem agendou avaliação.',
       'Orçamentos de R$ 0 e o lote importado em 27/07 ficam de fora.'],
+    casa: ['Aprovado por leads do período que não agendaram avaliação: paciente da casa que escreveu no WhatsApp e fez outro procedimento. Fica fora do funil.'],
     tempos: ['Medianas, só entre os leads que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
     semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
       () => `Leads dos últimos ${D.maturacaoDias} dias ainda estão em maturação: parte deles ainda vai agendar ou aprovar.`],
@@ -390,17 +393,20 @@ button { font: inherit; color: inherit; cursor: pointer; }
     balao.style.left = Math.max(8, Math.min(r.left - 12, innerWidth - w - 8)) + 'px';
     balao.style.top = (r.bottom + 8 + h > innerHeight ? r.top - h - 8 : r.bottom + 8) + 'px';
   }
-  document.querySelectorAll('[data-dica]').forEach((s) => {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'dica-botao'; b.dataset.chave = s.dataset.dica; b.setAttribute('aria-label', 'Sobre este quadro');
-    b.innerHTML = ICONE_I;
-    b.addEventListener('mouseenter', () => abrirDica(b));
-    b.addEventListener('mouseleave', fecharDica);
-    b.addEventListener('focus', () => abrirDica(b));
-    b.addEventListener('blur', fecharDica);
-    b.addEventListener('click', (e) => { e.stopPropagation(); b.classList.contains('on') ? fecharDica() : abrirDica(b); });
-    s.replaceWith(b);
-  });
+  function ligarDicas(raiz, atributo = 'dicaLocal') {
+    raiz.querySelectorAll(atributo === 'dica' ? '[data-dica]' : '[data-dica-local]').forEach((s) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'dica-botao'; b.dataset.chave = s.dataset[atributo]; b.setAttribute('aria-label', 'Sobre este número');
+      b.innerHTML = ICONE_I;
+      b.addEventListener('mouseenter', () => abrirDica(b));
+      b.addEventListener('mouseleave', fecharDica);
+      b.addEventListener('focus', () => abrirDica(b));
+      b.addEventListener('blur', fecharDica);
+      b.addEventListener('click', (e) => { e.stopPropagation(); b.classList.contains('on') ? fecharDica() : abrirDica(b); });
+      s.replaceWith(b);
+    });
+  }
+  ligarDicas(document, 'dica');
   addEventListener('scroll', fecharDica, { passive: true });
 
   // ------------------------------------------------------------ dica que segue o ponteiro
@@ -537,7 +543,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
       `<div><span class="dash-mini-rotulo">Orçado</span><b>${reaisCurto(r.orcado)}</b></div>` +
       `<div><span class="dash-mini-rotulo">Aprovado</span><b>${reaisCurto(r.aprovado)} <small>${r.orcado ? pct(r.aprovado, r.orcado, 0) + ' do orçado' : ''}</small></b></div>` +
       `<div><span class="dash-mini-rotulo">Ticket aprovado</span><b>${r.aprovou ? reais(ticket) : '—'}</b></div>` +
-      `<div><span class="dash-mini-rotulo">Faltaram sem voltar</span><b>${n(r.faltou)} <small>${r.agendou ? pct(r.faltou, r.agendou, 0) + ' dos agendados' : ''}</small></b></div>`;
+      `<div><span class="dash-mini-rotulo">Faltaram sem voltar</span><b>${n(r.faltou)} <small>${r.agendou ? pct(r.faltou, r.agendou, 0) + ' dos agendados' : ''}</small></b></div>` +
+      `<div><span class="dash-mini-rotulo com-dica">Pacientes da casa<span data-dica-local="casa"></span></span><b>${reaisCurto(r.aprovadoFora)} <small>${leadsN(r.aprovouFora)}</small></b></div>`;
+    ligarDicas($('valores'));
   }
 
   // ------------------------------------------------------------ tempos
