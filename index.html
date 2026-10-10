@@ -242,6 +242,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .dash-hbarra { grid-template-columns: 104px minmax(0, 1fr) 36px 46px; gap: 8px; }
   .dash-colunas.eixo span:nth-child(even) { visibility: hidden; }
 }
+/* ---------------------------------------------------------------- datas personalizadas e estado do dado */
+.dash-datas { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--texto-3); }
+.dash-datas[hidden] { display: none; }
+.dash-datas input {
+  height: 30px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--borda);
+  background: var(--sup); color: var(--texto); font: inherit; font-size: 12.5px; color-scheme: dark;
+}
+[data-tema='claro'] .dash-datas input { color-scheme: light; background: #fff; }
+.dash-datas input:focus-visible { outline: none; border-color: var(--marca); box-shadow: 0 0 0 4px var(--marca-anel); }
+.dash-atualizado.velho { color: var(--alerta); }
+.dash-estado { font-size: 12px; font-weight: 500; color: var(--alerta); }
 </style>
 </head>
 <body>
@@ -256,6 +267,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     </nav>
     <div class="dash-barra">
       <div class="segmento" id="periodo" role="tablist" aria-label="Período"></div>
+      <span class="dash-datas" id="datas" hidden>
+        <input type="date" id="de" aria-label="De"><span>até</span><input type="date" id="ate" aria-label="Até">
+      </span>
       <button class="seletor-rotulo" id="origem" type="button" aria-haspopup="listbox"></button>
     </div>
   </div>
@@ -275,7 +289,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   </div>
 
   <section class="dash-secao">
-    <div class="dash-secao-topo"><h2 class="com-dica">Até onde o lead chegou, por semana<span data-dica="semanas"></span></h2></div>
+    <div class="dash-secao-topo"><h2 class="com-dica"><span id="titulo-tempo">Até onde o lead chegou</span><span data-dica="semanas"></span></h2><span class="dash-estado" id="estado-tempo"></span></div>
     <div class="dash-legenda" id="legenda"></div>
     <div class="dash-colunas-caixa" id="semanas"></div>
     <details class="dash-tabela-ver"><summary>Ver em tabela</summary><div class="tabela-rolagem" id="semanas-tabela"></div></details>
@@ -291,35 +305,77 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <script src="dados.js"></script>
 <script>
 (() => {
-  const D = window.FUNIL;
+  let D = window.FUNIL;
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   // ------------------------------------------------------------ formato
   const nf = new Intl.NumberFormat('pt-BR');
   const n = (x) => nf.format(x);
-  const pct = (a, b, casas = 1) => (b ? (100 * a / b).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }) : '—') + (b ? '%' : '');
+  const pct = (a, b, casas = 1) => (b ? (100 * a / b).toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas }) + '%' : '—');
   const reais = (x) => 'R$ ' + nf.format(Math.round(x));
   const reaisCurto = (x) => x >= 1e6 ? 'R$ ' + (x / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 }) + ' mi'
     : x >= 1e4 ? 'R$ ' + nf.format(Math.round(x / 1e3)) + ' mil' : reais(x);
   const dias = (d) => d == null ? '—' : d < 1 ? Math.max(1, Math.round(d * 24)) + ' h'
     : d.toLocaleString('pt-BR', { maximumFractionDigits: d < 10 ? 1 : 0 }) + (d < 2 ? ' dia' : ' dias');
-  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  const nomeMes = (m) => { const s = MESES[+m.slice(5, 7) - 1]; return s[0].toUpperCase() + s.slice(1); };
   const ddmm = (iso) => iso.slice(8, 10) + '/' + iso.slice(5, 7);
+  const leadsN = (x) => n(x) + (x === 1 ? ' lead' : ' leads');
 
-  // ------------------------------------------------------------ estado (lembrado neste navegador)
-  const CHAVE = 'nossolarmed:funil';
-  let estado = { periodo: 'todos', origem: 'todas' };
-  try { Object.assign(estado, JSON.parse(localStorage.getItem(CHAVE) || '{}')); } catch (e) {}
-  if (!D.cubo[estado.periodo]) estado.periodo = 'todos';
-  if (!D.cubo.todos[estado.origem]) estado.origem = 'todas';
-  const salvar = () => { try { localStorage.setItem(CHAVE, JSON.stringify(estado)); } catch (e) {} };
+  // ------------------------------------------------------------ datas (sempre no horário de Brasília)
+  const DIA = 864e5;
+  const isoBRT = (ms) => new Date(ms - 3 * 3600e3).toISOString();
+  const hoje = () => isoBRT(Date.now()).slice(0, 10);
+  const somaDias = (iso, k) => new Date(Date.parse(iso + 'T12:00:00Z') + k * DIA).toISOString().slice(0, 10);
+  const diasEntre = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / DIA);
+  const PRESETS = [
+    ['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7d', '7 dias'], ['30d', '30 dias'], ['mes', 'Este mês'], ['tudo', 'Tudo'], ['custom', 'Personalizado'],
+  ];
+
+  // ------------------------------------------------------------ estado: abre sempre em Hoje e todas as origens
+  const estado = { preset: 'hoje', de: hoje(), ate: hoje(), origem: 'todas' };
   const nomeOrigem = (id) => id === 'todas' ? 'Todas as origens' : D.origens.find((o) => o.id === id).nome;
 
-  // A coorte está em maturação quando há lead com menos de 30 dias desde a extração.
-  const corte = new Date(Date.parse(D.extraidoEm) - D.maturacaoDias * 864e5).toISOString().slice(0, 7);
-  const periodoMaturando = (p) => p !== 'todos' && p >= corte;
+  function intervalo() {
+    const h = hoje();
+    switch (estado.preset) {
+      case 'hoje': return [h, h];
+      case 'ontem': return [somaDias(h, -1), somaDias(h, -1)];
+      case '7d': return [somaDias(h, -6), h];
+      case '30d': return [somaDias(h, -29), h];
+      case 'mes': return [h.slice(0, 8) + '01', h];
+      case 'tudo': return [D.primeiroDia || h, h];
+      default: return [estado.de, estado.ate];
+    }
+  }
+  function nomeIntervalo([a, b]) {
+    if (a === b) return a === hoje() ? 'hoje' : a === somaDias(hoje(), -1) ? 'ontem' : ddmm(a);
+    return `${ddmm(a)} a ${ddmm(b)}`;
+  }
+
+  // ------------------------------------------------------------ soma das linhas do período
+  // linha: [hora, origem, leads, agendou, veio, orcou, aprovou, faltou, orcado, aprovado, [t1], [t2], [t3]]
+  const quantil = (v, q) => {
+    if (!v.length) return null;
+    v.sort((x, y) => x - y);
+    const i = (v.length - 1) * q, b = Math.floor(i);
+    return v[b] + (v[Math.min(b + 1, v.length - 1)] - v[b]) * (i - b);
+  };
+  function linhasDe([a, b], origem) {
+    const oi = origem === 'todas' ? -1 : D.origens.findIndex((o) => o.id === origem);
+    return D.linhas.filter((l) => { const d = l[0].slice(0, 10); return d >= a && d <= b && (oi < 0 || l[1] === oi); });
+  }
+  function resumo(ls) {
+    const r = { leads: 0, agendou: 0, veio: 0, orcou: 0, aprovou: 0, faltou: 0, orcado: 0, aprovado: 0 };
+    const t1 = [], t2 = [], t3 = [];
+    for (const l of ls) {
+      r.leads += l[2]; r.agendou += l[3]; r.veio += l[4]; r.orcou += l[5]; r.aprovou += l[6]; r.faltou += l[7]; r.orcado += l[8]; r.aprovado += l[9];
+      t1.push(...l[10]); t2.push(...l[11]); t3.push(...l[12]);
+    }
+    r.tempos = { leadAgenda: quantil(t1, 0.5), agendaConsulta: quantil(t2, 0.5), leadAprovacao: quantil(t3, 0.5), leadAprovacaoP80: quantil(t3, 0.8) };
+    return r;
+  }
+  const corteMaturacao = () => isoBRT(Date.parse(D.extraidoEm) - D.maturacaoDias * DIA).slice(0, 10);
+  const aguardandoNo = ([a, b]) => (D.aguardandoAceite || []).filter((h) => h.slice(0, 10) >= a && h.slice(0, 10) <= b);
 
   // ------------------------------------------------------------ dicas ("i")
   const DICAS = {
@@ -327,8 +383,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
       'Quem recebeu orçamento conta como compareceu, porque cerca de 25% das consultas ficam sem status na agenda.',
       'Orçamentos de R$ 0 e o lote importado em 27/07 ficam de fora.'],
     tempos: ['Medianas, só entre os leads que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
-    semanas: ['Cada coluna é a semana em que o lead chegou; a cor diz até onde ele foi.',
-      `Semanas dos últimos ${D.maturacaoDias} dias ainda estão em maturação: parte desses leads ainda vai agendar ou aprovar.`],
+    semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
+      () => `Leads dos últimos ${D.maturacaoDias} dias ainda estão em maturação: parte deles ainda vai agendar ou aprovar.`],
     origem: ['Origem pela etiqueta do Kommo. Lead com mais de uma etiqueta conta numa só, na ordem da tabela.',
       'As etiquetas começaram em agosto: 96% dos leads de julho estão sem etiqueta. Para comparar origens, olhe de agosto em diante.',
       'Clique numa linha para filtrar a página por ela.'],
@@ -339,7 +395,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function abrirDica(btn) {
     fecharDica();
     balao = document.createElement('div'); balao.className = 'dica-balao'; balao.setAttribute('role', 'tooltip');
-    balao.innerHTML = DICAS[btn.dataset.chave].map((p) => `<p>${esc(p)}</p>`).join('');
+    balao.innerHTML = DICAS[btn.dataset.chave].map((p) => `<p>${esc(typeof p === 'function' ? p() : p)}</p>`).join('');
     document.body.appendChild(balao); btn.classList.add('on');
     const r = btn.getBoundingClientRect(), w = balao.offsetWidth, h = balao.offsetHeight;
     balao.style.left = Math.max(8, Math.min(r.left - 12, innerWidth - w - 8)) + 'px';
@@ -392,16 +448,31 @@ button { font: inherit; color: inherit; cursor: pointer; }
   });
   pintarBotaoTema();
 
-  // ------------------------------------------------------------ filtros
+  // ------------------------------------------------------------ filtros: período
   function desenharPeriodo() {
-    const ps = ['todos', ...D.meses];
-    $('periodo').innerHTML = ps.map((p) => `<button type="button" role="tab" data-p="${p}" class="${p === estado.periodo ? 'on' : ''}" aria-selected="${p === estado.periodo}">${p === 'todos' ? 'Tudo' : nomeMes(p)}</button>`).join('');
+    $('periodo').innerHTML = PRESETS.map(([p, rot]) => `<button type="button" role="tab" data-p="${p}" class="${p === estado.preset ? 'on' : ''}" aria-selected="${p === estado.preset}">${rot}</button>`).join('');
+    const custom = estado.preset === 'custom';
+    $('datas').hidden = !custom;
+    if (custom) {
+      const min = D.primeiroDia || '', max = hoje();
+      for (const id of ['de', 'ate']) { $(id).min = min; $(id).max = max; }
+      $('de').value = estado.de; $('ate').value = estado.ate;
+    }
   }
   $('periodo').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
-    estado.periodo = b.dataset.p; salvar(); desenhar();
+    if (b.dataset.p === 'custom' && estado.preset !== 'custom') [estado.de, estado.ate] = intervalo(); // começa no que estava na tela
+    estado.preset = b.dataset.p; desenhar();
+    if (estado.preset === 'custom') $('de').focus();
+  });
+  for (const id of ['de', 'ate']) $(id).addEventListener('change', () => {
+    let de = $('de').value, ate = $('ate').value;
+    if (!de || !ate) return;
+    if (de > ate) { if (id === 'de') ate = de; else de = ate; } // a outra ponta acompanha
+    estado.de = de; estado.ate = ate; desenhar();
   });
 
+  // ------------------------------------------------------------ filtros: origem
   const SETA = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
   const OK = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
   let menu = null;
@@ -414,8 +485,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function abrirMenu() {
     const b = $('origem');
     menu = document.createElement('div'); menu.className = 'menu'; menu.setAttribute('role', 'listbox');
-    const c = D.cubo[estado.periodo];
-    const item = (id) => `<button type="button" role="option" data-o="${id}" aria-selected="${id === estado.origem}"><span>${esc(nomeOrigem(id))}</span><span class="n">${n(c[id].leads)}</span><span class="ok">${id === estado.origem ? OK : ''}</span></button>`;
+    const iv = intervalo();
+    const item = (id) => `<button type="button" role="option" data-o="${id}" aria-selected="${id === estado.origem}"><span>${esc(nomeOrigem(id))}</span><span class="n">${n(resumo(linhasDe(iv, id)).leads)}</span><span class="ok">${id === estado.origem ? OK : ''}</span></button>`;
     menu.innerHTML = item('todas') + '<hr>' + D.origens.map((o) => item(o.id)).join('');
     document.body.appendChild(menu);
     const r = b.getBoundingClientRect();
@@ -436,27 +507,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
       escolherOrigem(x.dataset.o); fecharMenu(); b.focus();
     });
   }
-  function escolherOrigem(id) { estado.origem = id; salvar(); desenhar(); }
+  function escolherOrigem(id) { estado.origem = id; desenhar(); }
   $('origem').addEventListener('click', (e) => { e.stopPropagation(); menu ? fecharMenu() : abrirMenu(); });
   document.addEventListener('click', (e) => { if (menu && !menu.contains(e.target)) fecharMenu(); fecharDica(); });
   addEventListener('resize', fecharMenu);
 
   // ------------------------------------------------------------ indicadores
   // Chats que ainda estão na entrada do Kommo, sem aceite: ainda não são lead, então ficam fora do funil.
-  function aguardando() {
-    const a = D.aguardandoAceite; if (!a || !a.total || estado.origem !== 'todas') return '';
-    const q = estado.periodo === 'todos' ? a.total : (a.porMes[estado.periodo] || 0);
-    if (!q) return '';
-    return ` · <span class="maturando" data-tip="${esc(`<div class="dash-tip-titulo">Entrada do Kommo</div>${n(q)} ${q === 1 ? 'chat ainda não aceito' : 'chats ainda não aceitos'}; o mais antigo chegou em ${new Date(a.maisAntigo).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}. Só entram no funil depois do aceite.`)}">+${n(q)} aguardando aceite</span>`;
+  function aguardando(iv) {
+    if (estado.origem !== 'todas') return '';
+    const hs = aguardandoNo(iv); if (!hs.length) return '';
+    const mais = hs[0];
+    const t = `<div class="dash-tip-titulo">Entrada do Kommo</div>${n(hs.length)} ${hs.length === 1 ? 'chat ainda não aceito' : 'chats ainda não aceitos'}; o mais antigo chegou em ${ddmm(mais)} às ${mais.slice(11, 16)}. Só entram no funil depois do aceite.`;
+    return ` · <span class="maturando" data-tip="${esc(t)}">+${n(hs.length)} aguardando aceite</span>`;
   }
-  function desenharKpis(r) {
-    const mat = periodoMaturando(estado.periodo);
+  function desenharKpis(r, iv) {
+    const mat = iv[1] > corteMaturacao();
     const kpi = (rotulo, valor, sub) => `<div class="dash-kpi"><span class="dash-kpi-rotulo">${rotulo}</span><b>${valor}</b><span class="dash-kpi-sub">${sub}</span></div>`;
     $('kpis').innerHTML =
-      kpi('Leads', n(r.leads), (estado.origem === 'todas' ? 'criados no Kommo' : esc(nomeOrigem(estado.origem))) + aguardando()) +
-      kpi('Agendaram', pct(r.agendou, r.leads), `${n(r.agendou)} leads`) +
-      kpi('Compareceram', pct(r.veio, r.agendou), `dos agendados · ${n(r.veio)} leads`) +
-      kpi('Aprovaram', pct(r.aprovou, r.leads), `${n(r.aprovou)} leads · ${reaisCurto(r.aprovado)}` + (mat ? ' · <span class="maturando">em maturação</span>' : ''));
+      kpi('Leads', n(r.leads), (estado.origem === 'todas' ? 'criados no Kommo' : esc(nomeOrigem(estado.origem))) + aguardando(iv)) +
+      kpi('Agendaram', pct(r.agendou, r.leads), leadsN(r.agendou)) +
+      kpi('Compareceram', pct(r.veio, r.agendou), `dos agendados · ${leadsN(r.veio)}`) +
+      kpi('Aprovaram', pct(r.aprovou, r.leads), `${leadsN(r.aprovou)} · ${reaisCurto(r.aprovado)}` + (mat && r.leads ? ' · <span class="maturando">em maturação</span>' : ''));
   }
 
   // ------------------------------------------------------------ funil
@@ -465,7 +537,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const cor = getComputedStyle(document.documentElement).getPropertyValue('--serie-1').trim();
     $('funil').innerHTML = passos.map(([rot, v], i) => {
       const ant = i ? passos[i - 1] : null;
-      const t = `<div class="dash-tip-titulo">${rot}</div>` + linhaTip(cor, n(v), 'leads') +
+      const t = `<div class="dash-tip-titulo">${rot}</div>` + linhaTip(cor, n(v), v === 1 ? 'lead' : 'leads') +
         `<div class="dash-tip-nota">${pct(v, r.leads)} dos leads${ant ? ` · ${pct(v, ant[1])} de “${ant[0].toLowerCase()}”` : ''}</div>`;
       return `<div class="dash-hbarra" data-tip="${esc(t)}"><span class="dash-hbarra-rotulo">${rot}</span>
         <span class="dash-hbarra-trilho"><i style="width:${r.leads ? (100 * v / r.leads) : 0}%"></i></span>
@@ -474,9 +546,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const ticket = r.aprovou ? r.aprovado / r.aprovou : 0;
     $('valores').innerHTML =
       `<div><span class="dash-mini-rotulo">Orçado</span><b>${reaisCurto(r.orcado)}</b></div>` +
-      `<div><span class="dash-mini-rotulo">Aprovado</span><b>${reaisCurto(r.aprovado)} <small>${pct(r.aprovado, r.orcado, 0)} do orçado</small></b></div>` +
+      `<div><span class="dash-mini-rotulo">Aprovado</span><b>${reaisCurto(r.aprovado)} <small>${r.orcado ? pct(r.aprovado, r.orcado, 0) + ' do orçado' : ''}</small></b></div>` +
       `<div><span class="dash-mini-rotulo">Ticket aprovado</span><b>${r.aprovou ? reais(ticket) : '—'}</b></div>` +
-      `<div><span class="dash-mini-rotulo">Faltaram sem voltar</span><b>${n(r.faltou)} <small>${pct(r.faltou, r.agendou, 0)} dos agendados</small></b></div>`;
+      `<div><span class="dash-mini-rotulo">Faltaram sem voltar</span><b>${n(r.faltou)} <small>${r.agendou ? pct(r.faltou, r.agendou, 0) + ' dos agendados' : ''}</small></b></div>`;
   }
 
   // ------------------------------------------------------------ tempos
@@ -489,48 +561,79 @@ button { font: inherit; color: inherit; cursor: pointer; }
       linha('Do lead à aprovação', dias(t.leadAprovacao), t.leadAprovacaoP80 != null ? `80% aprovam em até ${dias(t.leadAprovacaoP80)}` : '');
   }
 
-  // ------------------------------------------------------------ semanas
+  // ------------------------------------------------------------ no tempo: por hora (1 dia), por dia (até 45) ou por semana
   const PASSOS = [['aprovou', 'Aprovou', '--passo-aprovou'], ['veio', 'Compareceu, sem aprovar', '--passo-veio'],
     ['agendou', 'Agendou, sem comparecer', '--passo-agendou'], ['nao', 'Não agendou', '--passo-nao']];
-  function desenharSemanas() {
+  function baldes([a, b]) {
+    const nDias = diasEntre(a, b) + 1;
+    if (nDias === 1) {
+      const ate = a === hoje() ? +isoBRT(Date.now()).slice(11, 13) : 23;
+      return { tipo: 'hora', lista: Array.from({ length: ate + 1 }, (_, h) => {
+        const hh = String(h).padStart(2, '0'), chave = `${a}T${hh}`;
+        return { rotulo: `${hh}h`, titulo: `${ddmm(a)}, das ${hh}h às ${hh}h59`, fim: a, casa: (l) => l[0] === chave };
+      }) };
+    }
+    if (nDias <= 45) return { tipo: 'dia', lista: Array.from({ length: nDias }, (_, k) => {
+      const d = somaDias(a, k);
+      return { rotulo: ddmm(d), titulo: `Dia ${ddmm(d)}`, fim: d, casa: (l) => l[0].startsWith(d) };
+    }) };
+    // semanas começando na segunda
+    const seg = (d) => somaDias(d, -((new Date(d + 'T12:00:00Z').getUTCDay() + 6) % 7));
+    const lista = [];
+    for (let s = seg(a); s <= b; s = somaDias(s, 7)) {
+      const ini = s < a ? a : s, fim = somaDias(s, 6) > b ? b : somaDias(s, 6);
+      lista.push({ rotulo: ddmm(s), titulo: `Semana de ${ddmm(ini)} a ${ddmm(fim)}`, fim, casa: (l) => { const d = l[0].slice(0, 10); return d >= ini && d <= fim; } });
+    }
+    return { tipo: 'semana', lista };
+  }
+  function desenharTempo(iv) {
     const css = getComputedStyle(document.documentElement);
     const cores = Object.fromEntries(PASSOS.map(([k, , v]) => [k, css.getPropertyValue(v).trim()]));
     $('legenda').innerHTML = PASSOS.map(([k, rot]) => `<span><i style="background:${cores[k]}"></i>${rot}</span>`).join('');
-    const todas = D.porSemana[estado.origem];
-    const ss = estado.periodo === 'todos' ? todas : todas.filter((s) => s.mes === estado.periodo);
+    const { tipo, lista } = baldes(iv);
+    $('titulo-tempo').textContent = 'Até onde o lead chegou, por ' + tipo;
+    const ls = linhasDe(iv, estado.origem);
+    const corte = corteMaturacao();
+    const ss = lista.map((b) => {
+      const r = resumo(ls.filter(b.casa));
+      return { ...b, leads: r.leads, aprovou: r.aprovou, veio: r.veio - r.aprovou, agendou: r.agendou - r.veio, nao: r.leads - r.agendou, maturando: b.fim > corte };
+    });
+    const todosMat = ss.length > 0 && ss.every((s) => s.maturando);
+    $('estado-tempo').textContent = todosMat ? 'em maturação' : '';
     const max = Math.max(1, ...ss.map((s) => s.leads));
     // três ou quatro linhas de grade, em passo redondo (1, 2 ou 5 × 10^k)
-    const bruto = max / 4, ordem = 10 ** Math.floor(Math.log10(bruto)), f = bruto / ordem;
-    const passo = Math.max(1, (f > 5 ? 10 : f > 2 ? 5 : f > 1 ? 2 : 1) * ordem);
+    const bruto = Math.max(max / 4, 1), ordem = 10 ** Math.floor(Math.log10(bruto)), f = bruto / ordem;
+    const passo = (f > 5 ? 10 : f > 2 ? 5 : f > 1 ? 2 : 1) * ordem;
     const grades = []; for (let v = passo; v <= max; v += passo) grades.push(v);
     const colunas = ss.map((s) => {
-      const fim = new Date(Date.parse(s.semana + 'T12:00:00Z') + 6 * 864e5).toISOString().slice(0, 10);
-      const t = `<div class="dash-tip-titulo">Semana de ${ddmm(s.semana)} a ${ddmm(fim)}</div>` +
+      const t = `<div class="dash-tip-titulo">${s.titulo}</div>` +
         PASSOS.map(([k, rot]) => linhaTip(cores[k], `${n(s[k])} <span class="sutil">${pct(s[k], s.leads, 0)}</span>`, rot)).join('') +
-        `<div class="dash-tip-nota">${n(s.leads)} leads${s.maturando ? ' · em maturação' : ''}</div>`;
+        `<div class="dash-tip-nota">${leadsN(s.leads)}${s.maturando && !todosMat ? ' · em maturação' : ''}</div>`;
       // cada parte cresce na proporção da contagem; o vão de 2px entre elas sai do espaço, não soma altura
       const partes = PASSOS.map(([k]) => s[k] ? `<i style="flex:${s[k]} 1 0;background:${cores[k]}"></i>` : '').join('');
-      return `<div class="dash-coluna${s.maturando ? ' maturando-col' : ''}" data-tip="${esc(t)}"><div class="dash-coluna-pilha" style="height:${(100 * s.leads / max).toFixed(2)}%">${partes}</div></div>`;
+      return `<div class="dash-coluna${s.maturando && !todosMat ? ' maturando-col' : ''}" data-tip="${esc(t)}"><div class="dash-coluna-pilha" style="height:${(100 * s.leads / max).toFixed(2)}%">${partes}</div></div>`;
     }).join('');
     const iMat = ss.findIndex((s) => s.maturando);
     const marca = iMat > 0 ? `<div class="dash-marca-mat" style="left:calc((100% - 32px) * ${(iMat / ss.length).toFixed(4)} - 1px)"><span>em maturação</span></div>` : '';
+    // rótulos do eixo: no máximo ~14, para não encavalar
+    const cada = Math.ceil(ss.length / 14);
     $('semanas').innerHTML =
       `<div class="dash-colunas plot" style="--n:${ss.length}">${grades.map((v) => `<div class="dash-grade" style="bottom:${(100 * v / max).toFixed(2)}%"><span>${v}</span></div>`).join('')}${colunas}${marca}</div>` +
-      `<div class="dash-colunas eixo" style="--n:${ss.length}">${ss.map((s) => `<span>${ddmm(s.semana)}</span>`).join('')}</div>`;
-    $('semanas-tabela').innerHTML = `<table class="tabela"><thead><tr><th>Semana</th><th>Leads</th>${PASSOS.map(([, rot]) => `<th>${rot}</th>`).join('')}</tr></thead><tbody>` +
-      ss.map((s) => `<tr><td>${ddmm(s.semana)}${s.maturando ? ' <span class="sutil">em maturação</span>' : ''}</td><td>${n(s.leads)}</td>${PASSOS.map(([k]) => `<td>${n(s[k])}<span class="pct-n">${pct(s[k], s.leads, 0)}</span></td>`).join('')}</tr>`).join('') +
+      `<div class="dash-colunas eixo" style="--n:${ss.length}">${ss.map((s, i) => `<span>${i % cada === 0 ? s.rotulo : ''}</span>`).join('')}</div>`;
+    const cab = tipo === 'hora' ? 'Hora' : tipo === 'dia' ? 'Dia' : 'Semana';
+    $('semanas-tabela').innerHTML = `<table class="tabela"><thead><tr><th>${cab}</th><th>Leads</th>${PASSOS.map(([, rot]) => `<th>${rot}</th>`).join('')}</tr></thead><tbody>` +
+      ss.map((s) => `<tr><td>${s.rotulo}</td><td>${n(s.leads)}</td>${PASSOS.map(([k]) => `<td>${n(s[k])}<span class="pct-n">${pct(s[k], s.leads, 0)}</span></td>`).join('')}</tr>`).join('') +
       '</tbody></table>';
   }
 
   // ------------------------------------------------------------ por origem
-  function desenharOrigens() {
-    const linhas = D.porOrigem[estado.periodo];
-    const tot = D.cubo[estado.periodo].todas;
+  function desenharOrigens(iv) {
+    const tot = resumo(linhasDe(iv, 'todas'));
     const celula = (a, b) => `${pct(a, b)}<span class="pct-n">${n(a)}</span>`;
     const tr = (r, nome, cls, attr) => `<tr class="${cls}" ${attr}><td>${esc(nome)}</td><td>${n(r.leads)}</td><td>${celula(r.agendou, r.leads)}</td>` +
       `<td>${celula(r.veio, r.agendou)}</td><td>${celula(r.aprovou, r.leads)}</td><td>${reais(r.aprovado)}</td><td>${r.leads ? reais(r.aprovado / r.leads) : '—'}</td></tr>`;
     $('origens').innerHTML = `<table class="tabela"><thead><tr><th>Origem</th><th>Leads</th><th>Agendaram</th><th>Compareceram<br><span class="sutil">dos agendados</span></th><th>Aprovaram</th><th>Aprovado</th><th>Aprovado por lead</th></tr></thead><tbody>` +
-      linhas.map((r) => tr(r, nomeOrigem(r.id), r.id === estado.origem ? 'on' : '', `data-o="${r.id}" tabindex="0"`)).join('') +
+      D.origens.map((o) => tr(resumo(linhasDe(iv, o.id)), o.nome, o.id === estado.origem ? 'on' : '', `data-o="${o.id}" tabindex="0"`)).join('') +
       `</tbody><tfoot>${tr(tot, 'Total', '', '')}</tfoot></table>`;
   }
   $('origens').addEventListener('click', (e) => {
@@ -542,17 +645,43 @@ button { font: inherit; color: inherit; cursor: pointer; }
     e.preventDefault(); escolherOrigem(r.dataset.o === estado.origem ? 'todas' : r.dataset.o);
   });
 
+  // ------------------------------------------------------------ quando os dados foram puxados
+  function desenharAtualizado() {
+    const g = Date.parse(D.extraidoEm), min = (Date.now() - g) / 6e4;
+    const quando = isoBRT(g);
+    const el = $('atualizado');
+    el.textContent = (quando.slice(0, 10) === hoje() ? 'Atualizado às ' : `Dados de ${ddmm(quando)} às `) + quando.slice(11, 16);
+    // o PC que atualiza pode estar desligado: depois de 20 min parado, o horário fica em alerta
+    el.classList.toggle('velho', min > 20);
+    el.title = min > 20 ? 'Sem atualização há ' + (min < 120 ? Math.round(min) + ' min' : Math.round(min / 60) + ' h') : '';
+  }
+
   // ------------------------------------------------------------ tudo
   function desenhar() {
-    const r = D.cubo[estado.periodo][estado.origem];
-    desenharPeriodo(); desenharOrigem(); desenharKpis(r); desenharFunil(r); desenharTempos(r); desenharSemanas(); desenharOrigens();
+    const iv = intervalo();
+    const r = resumo(linhasDe(iv, estado.origem));
+    desenharPeriodo(); desenharOrigem(); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharTempo(iv); desenharOrigens(iv); desenharAtualizado();
+    document.title = `Funil comercial · ${nomeIntervalo(iv)} · NossoLarMed`;
   }
-  const ext = new Date(D.extraidoEm);
-  $('atualizado').textContent = 'Dados de ' + ext.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' às ' +
-    ext.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+  if (!D || !D.linhas) D = { linhas: [], origens: D?.origens || [], aguardandoAceite: [], maturacaoDias: 21, extraidoEm: new Date(0).toISOString(), primeiroDia: null };
   desenhar();
   // as cores das barras vêm dos tokens: trocar o tema redesenha
   new MutationObserver(desenhar).observe(document.documentElement, { attributes: true, attributeFilter: ['data-tema'] });
+
+  // ------------------------------------------------------------ ao vivo: busca o dados.json a cada minuto
+  // (no GitHub Pages; aberto direto do disco o fetch falha em silêncio e fica o dados.js da carga)
+  // Também logo ao abrir: o Pages guarda o dados.js em cache por até 10 min.
+  let diaVisto = hoje();
+  async function buscar() {
+    try {
+      const r = await fetch('dados.json?t=' + Date.now(), { cache: 'no-store' });
+      if (r.ok) { const novo = await r.json(); if (novo.linhas && novo.geradoEm !== D.geradoEm) { D = novo; diaVisto = hoje(); return desenhar(); } }
+    } catch (e) {}
+    if (hoje() !== diaVisto) { diaVisto = hoje(); return desenhar(); } // virou o dia: "Hoje" anda junto
+    desenharAtualizado();
+  }
+  buscar();
+  setInterval(buscar, 60e3);
 })();
 </script>
 </body>
