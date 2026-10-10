@@ -442,11 +442,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
   addEventListener('resize', fecharMenu);
 
   // ------------------------------------------------------------ indicadores
+  // Chats que ainda estão na entrada do Kommo, sem aceite: ainda não são lead, então ficam fora do funil.
+  function aguardando() {
+    const a = D.aguardandoAceite; if (!a || !a.total || estado.origem !== 'todas') return '';
+    const q = estado.periodo === 'todos' ? a.total : (a.porMes[estado.periodo] || 0);
+    if (!q) return '';
+    return ` · <span class="maturando" data-tip="${esc(`<div class="dash-tip-titulo">Entrada do Kommo</div>${n(q)} ${q === 1 ? 'chat ainda não aceito' : 'chats ainda não aceitos'}; o mais antigo chegou em ${new Date(a.maisAntigo).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })}. Só entram no funil depois do aceite.`)}">+${n(q)} aguardando aceite</span>`;
+  }
   function desenharKpis(r) {
     const mat = periodoMaturando(estado.periodo);
     const kpi = (rotulo, valor, sub) => `<div class="dash-kpi"><span class="dash-kpi-rotulo">${rotulo}</span><b>${valor}</b><span class="dash-kpi-sub">${sub}</span></div>`;
     $('kpis').innerHTML =
-      kpi('Leads', n(r.leads), estado.origem === 'todas' ? 'criados no Kommo' : esc(nomeOrigem(estado.origem))) +
+      kpi('Leads', n(r.leads), (estado.origem === 'todas' ? 'criados no Kommo' : esc(nomeOrigem(estado.origem))) + aguardando()) +
       kpi('Agendaram', pct(r.agendou, r.leads), `${n(r.agendou)} leads`) +
       kpi('Compareceram', pct(r.veio, r.agendou), `dos agendados · ${n(r.veio)} leads`) +
       kpi('Aprovaram', pct(r.aprovou, r.leads), `${n(r.aprovou)} leads · ${reaisCurto(r.aprovado)}` + (mat ? ' · <span class="maturando">em maturação</span>' : ''));
