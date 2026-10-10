@@ -367,24 +367,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
     return r;
   }
   const corteMaturacao = () => isoBRT(Date.parse(D.extraidoEm) - D.maturacaoDias * DIA).slice(0, 10);
-  // avaliações marcadas pela data em que a recepção marcou (não pela chegada do lead)
-  const marcadasNo = ([a, b]) => {
+  // Eventos pela data em que aconteceram (regra do Nathan, 10/10): cada etapa conta o que a clínica fez no período.
+  // evento: [hora, origem (-1 = sem lead no Kommo), tipo, quantidade, valor]
+  function eventosNo([a, b]) {
     const oi = estado.origem === 'todas' ? null : D.origens.findIndex((o) => o.id === estado.origem);
-    return (D.marcadas || []).reduce((t, [h, o, q]) => { const d = h.slice(0, 10); return d >= a && d <= b && (oi == null || o === oi) ? t + q : t; }, 0);
-  };
+    const t = {};
+    for (const [h, o, tipo, q, v] of D.eventos || []) {
+      const d = h.slice(0, 10);
+      if (d < a || d > b || (oi != null && o !== oi)) continue;
+      const x = (t[tipo] ??= { q: 0, v: 0 }); x.q += q; x.v += v;
+    }
+    const z = (k) => t[k] || { q: 0, v: 0 };
+    return { marcada: z('marcada'), prevista: z('prevista'), compareceu: z('compareceu'), faltou: z('faltou'),
+      orcamento: z('orcamento'), aprovado: z('aprovado'), casa: z('casa') };
+  }
   const aguardandoNo = ([a, b]) => (D.aguardandoAceite || []).filter((h) => h.slice(0, 10) >= a && h.slice(0, 10) <= b);
 
   // ------------------------------------------------------------ dicas ("i")
   const DICAS = {
     funil: ['Leads criados no Kommo no período (sem o funil Contatos). O que aconteceu depois vem do Clinicorp, casado pelo telefone.',
-      'Agendaram: agendamento de avaliação (categoria "Avaliação …" ou "Urgência …" no Clinicorp) não cancelado. Compareceram: avaliação Atendida ou Em atendimento, ou recebeu orçamento.',
-      'Orçamento e aprovação contam só para quem agendou avaliação.',
-      'Orçamentos de R$ 0 e o lote importado em 27/07 ficam de fora.'],
+      'Cada etapa conta o que aconteceu no período, pela data do fato, mesmo que não sejam as mesmas pessoas: avaliações marcadas (dia em que a recepção marcou), comparecidas (dia da consulta), orçamentos emitidos e aprovados (dia de cada um).',
+      'Avaliação = categoria "Avaliação …" ou "Urgência …" no Clinicorp; cancelada não conta. Orçamento e aprovação só de quem fez avaliação nos 120 dias anteriores. Orçamentos de R$ 0 e o lote de 27/07 ficam de fora.',
+      'Percentual de cada linha: agendaram ÷ leads; compareceram ÷ avaliações previstas no período; orçamento e aprovação ÷ comparecidas.'],
     marcadas: ['Avaliações (categoria "Avaliação …" ou "Urgência …") marcadas no Clinicorp no período, pela data em que a recepção marcou. Conta todas, inclusive de quem chegou em dias anteriores ou não está no Kommo. Canceladas não contam.'],
-    agendaram: ['Avaliações marcadas no período ÷ leads que chegaram no período, mesmo que não sejam as mesmas pessoas (a avaliação de hoje pode ser de um lead de ontem).',
-      'O funil abaixo segue cada lead: "Agendaram" ali conta só quem chegou no período e já marcou.'],
-    casa: ['Aprovado por leads do período que não agendaram avaliação: paciente da casa que escreveu no WhatsApp e fez outro procedimento. Fica fora do funil.'],
-    tempos: ['Medianas, só entre os leads que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
+    agendaram: ['Avaliações marcadas no período ÷ leads que chegaram no período, mesmo que não sejam as mesmas pessoas (a avaliação de hoje pode ser de um lead de ontem).'],
+    comparecimento: ['Avaliações atendidas no período ÷ avaliações que estavam marcadas para o período e já passaram (atendidas, faltas e sem status). Canceladas não entram.'],
+    aprovacao: ['Orçamentos aprovados no período ÷ avaliações atendidas no período, mesmo que não sejam as mesmas pessoas.'],
+    casa: ['Orçamentos aprovados no período de quem não fez avaliação nos 120 dias anteriores: paciente da casa em tratamento. Fica fora do funil.'],
+    tempos: ['Medianas por lead (a única parte que segue cada pessoa), entre os leads do período que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
     semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
       () => `Leads dos últimos ${D.maturacaoDias} dias ainda estão em maturação: parte deles ainda vai agendar ou aprovar.`],
     origem: ['Origem pela etiqueta do Kommo. Lead com mais de uma etiqueta conta numa só, na ordem da tabela.',
@@ -526,39 +536,47 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const t = `<div class="dash-tip-titulo">Entrada do Kommo</div>${n(hs.length)} ${hs.length === 1 ? 'chat ainda não aceito' : 'chats ainda não aceitos'}; o mais antigo chegou em ${ddmm(mais)} às ${mais.slice(11, 16)}. Só entram no funil depois do aceite.`;
     return ` · <span class="maturando" data-tip="${esc(t)}">+${n(hs.length)} aguardando aceite</span>`;
   }
+  const plural = (q, um, varios) => `${n(q)} ${q === 1 ? um : varios}`;
   function desenharKpis(r, iv) {
-    const mat = iv[1] > corteMaturacao();
-    const marcadas = marcadasNo(iv);
+    const e = eventosNo(iv);
     const kpi = (rotulo, valor, sub) => `<div class="dash-kpi"><span class="dash-kpi-rotulo">${rotulo}</span><b>${valor}</b><span class="dash-kpi-sub">${sub}</span></div>`;
+    const comDica = (rot, chave) => `<span class="com-dica">${rot}<span data-dica-local="${chave}"></span></span>`;
     $('kpis').innerHTML =
       kpi('Leads', n(r.leads), (estado.origem === 'todas' ? 'criados no Kommo' : esc(nomeOrigem(estado.origem))) + aguardando(iv)) +
-      kpi('<span class="com-dica">Avaliações marcadas<span data-dica-local="marcadas"></span></span>', n(marcadas), 'no Clinicorp, no período') +
-      kpi('<span class="com-dica">Taxa de agendamento<span data-dica-local="agendaram"></span></span>', pct(marcadas, r.leads), `${n(marcadas)} ${marcadas === 1 ? 'avaliação' : 'avaliações'} ÷ ${leadsN(r.leads)}`) +
-      kpi('Compareceram', pct(r.veio, r.agendou), `dos agendados · ${leadsN(r.veio)}`) +
-      kpi('Aprovaram', pct(r.aprovou, r.leads), `${leadsN(r.aprovou)} · ${reaisCurto(r.aprovado)}` + (mat && r.leads ? ' · <span class="maturando">em maturação</span>' : ''));
+      kpi(comDica('Avaliações marcadas', 'marcadas'), n(e.marcada.q), 'no Clinicorp, no período') +
+      kpi(comDica('Taxa de agendamento', 'agendaram'), pct(e.marcada.q, r.leads), `${plural(e.marcada.q, 'avaliação', 'avaliações')} ÷ ${leadsN(r.leads)}`) +
+      kpi(comDica('Comparecimento', 'comparecimento'), pct(e.compareceu.q, e.prevista.q), `${n(e.compareceu.q)} de ${plural(e.prevista.q, 'avaliação prevista', 'avaliações previstas')}`) +
+      kpi(comDica('Aprovação', 'aprovacao'), pct(e.aprovado.q, e.compareceu.q), `${plural(e.aprovado.q, 'aprovado', 'aprovados')} ÷ ${plural(e.compareceu.q, 'comparecida', 'comparecidas')} · ${reaisCurto(e.aprovado.v)}`);
     ligarDicas($('kpis'));
   }
 
   // ------------------------------------------------------------ funil
   function desenharFunil(r) {
-    // "Agendaram" = avaliações marcadas no período, a mesma conta da taxa de agendamento (decisão do Nathan em 10/10)
-    const passos = [['Leads', r.leads], ['Agendaram', marcadasNo(intervalo())], ['Compareceram', r.veio], ['Com orçamento', r.orcou], ['Aprovaram', r.aprovou]];
+    const e = eventosNo(intervalo());
+    // [rótulo, quantidade, base do percentual, nome da base]
+    const passos = [
+      ['Leads', r.leads, r.leads, ''],
+      ['Agendaram', e.marcada.q, r.leads, 'dos leads'],
+      ['Compareceram', e.compareceu.q, e.prevista.q, 'das previstas'],
+      ['Com orçamento', e.orcamento.q, e.compareceu.q, 'das comparecidas'],
+      ['Aprovaram', e.aprovado.q, e.compareceu.q, 'das comparecidas'],
+    ];
     const cor = getComputedStyle(document.documentElement).getPropertyValue('--serie-1').trim();
-    $('funil').innerHTML = passos.map(([rot, v], i) => {
-      const ant = i ? passos[i - 1] : null;
-      const t = `<div class="dash-tip-titulo">${rot}</div>` + linhaTip(cor, n(v), v === 1 ? 'lead' : 'leads') +
-        `<div class="dash-tip-nota">${pct(v, r.leads)} dos leads${ant ? ` · ${pct(v, ant[1])} de “${ant[0].toLowerCase()}”` : ''}</div>`;
+    const topo = Math.max(1, ...passos.map((x) => x[1]));
+    $('funil').innerHTML = passos.map(([rot, v, base, nomeBase], i) => {
+      const t = `<div class="dash-tip-titulo">${rot}</div>` + linhaTip(cor, n(v), '') +
+        (i ? `<div class="dash-tip-nota">${pct(v, base)} ${nomeBase} (${n(base)})</div>` : '');
       return `<div class="dash-hbarra" data-tip="${esc(t)}"><span class="dash-hbarra-rotulo">${rot}</span>
-        <span class="dash-hbarra-trilho"><i style="width:${r.leads ? (100 * v / r.leads) : 0}%"></i></span>
-        <span class="dash-num">${n(v)}</span><span class="dash-hbarra-pct">${pct(v, r.leads)}</span></div>`;
+        <span class="dash-hbarra-trilho"><i style="width:${100 * v / topo}%"></i></span>
+        <span class="dash-num">${n(v)}</span><span class="dash-hbarra-pct">${i ? pct(v, base) : ''}</span></div>`;
     }).join('');
-    const ticket = r.aprovou ? r.aprovado / r.aprovou : 0;
+    const ticket = e.aprovado.q ? e.aprovado.v / e.aprovado.q : 0;
     $('valores').innerHTML =
-      `<div><span class="dash-mini-rotulo">Orçado</span><b>${reaisCurto(r.orcado)}</b></div>` +
-      `<div><span class="dash-mini-rotulo">Aprovado</span><b>${reaisCurto(r.aprovado)} <small>${r.orcado ? pct(r.aprovado, r.orcado, 0) + ' do orçado' : ''}</small></b></div>` +
-      `<div><span class="dash-mini-rotulo">Ticket aprovado</span><b>${r.aprovou ? reais(ticket) : '—'}</b></div>` +
-      `<div><span class="dash-mini-rotulo">Faltaram sem voltar</span><b>${n(r.faltou)} <small>${r.agendou ? pct(r.faltou, r.agendou, 0) + ' dos agendados' : ''}</small></b></div>` +
-      `<div><span class="dash-mini-rotulo com-dica">Pacientes da casa<span data-dica-local="casa"></span></span><b>${reaisCurto(r.aprovadoFora)} <small>${leadsN(r.aprovouFora)}</small></b></div>`;
+      `<div><span class="dash-mini-rotulo">Orçado</span><b>${reaisCurto(e.orcamento.v)}</b></div>` +
+      `<div><span class="dash-mini-rotulo">Aprovado</span><b>${reaisCurto(e.aprovado.v)} <small>${e.orcamento.v ? pct(e.aprovado.v, e.orcamento.v, 0) + ' do orçado' : ''}</small></b></div>` +
+      `<div><span class="dash-mini-rotulo">Ticket aprovado</span><b>${e.aprovado.q ? reais(ticket) : '—'}</b></div>` +
+      `<div><span class="dash-mini-rotulo">Faltaram</span><b>${n(e.faltou.q)} <small>${e.prevista.q ? pct(e.faltou.q, e.prevista.q, 0) + ' das previstas' : ''}</small></b></div>` +
+      `<div><span class="dash-mini-rotulo com-dica">Pacientes da casa<span data-dica-local="casa"></span></span><b>${reaisCurto(e.casa.v)} <small>${plural(e.casa.q, 'aprovado', 'aprovados')}</small></b></div>`;
     ligarDicas($('valores'));
   }
 
