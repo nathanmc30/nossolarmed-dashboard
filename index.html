@@ -541,7 +541,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   // ------------------------------------------------------------ funil
   function desenharFunil(r) {
-    const passos = [['Leads', r.leads], ['Agendaram', r.agendou], ['Compareceram', r.veio], ['Com orçamento', r.orcou], ['Aprovaram', r.aprovou]];
+    // "Agendaram" = avaliações marcadas no período, a mesma conta da taxa de agendamento (decisão do Nathan em 10/10)
+    const passos = [['Leads', r.leads], ['Agendaram', marcadasNo(intervalo())], ['Compareceram', r.veio], ['Com orçamento', r.orcou], ['Aprovaram', r.aprovou]];
     const cor = getComputedStyle(document.documentElement).getPropertyValue('--serie-1').trim();
     $('funil').innerHTML = passos.map(([rot, v], i) => {
       const ant = i ? passos[i - 1] : null;
