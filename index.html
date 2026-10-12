@@ -413,9 +413,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     agendaram: ['Avaliações marcadas no período ÷ leads que chegaram no período, mesmo que não sejam as mesmas pessoas (a avaliação de hoje pode ser de um lead de ontem).'],
     comparecimento: ['Avaliações atendidas no período ÷ avaliações que estavam marcadas para o período e já passaram (atendidas, faltas e sem status). Canceladas não entram.'],
     aprovacao: ['Orçamentos aprovados no período ÷ avaliações atendidas no período, mesmo que não sejam as mesmas pessoas.'],
-    casa: ['Orçamentos aprovados no período de quem não fez avaliação Meta, Google ou Urgência Google nos 120 dias anteriores: paciente da casa em tratamento ou avaliação de outra origem (Indicação, Outdoor…).'],
+    casa: ['Vendas do período de quem nunca fez avaliação de anúncio: base de pacientes, avaliação de outra origem (Indicação, Outdoor…) ou paciente novo marcado como procedimento. O detalhe está no Rastreio das vendas.'],
     rastreio: ['Toda venda (orçamento aprovado) do período, classificada pelo histórico do paciente na agenda do Clinicorp. O total bate com o aprovado no Clinicorp.',
-      'Do funil: fez Avaliação Meta, Google ou Urgência Google nos 120 dias antes do orçamento. Fora do funil: avaliação mais antiga, de outra origem, reavaliação, paciente novo cuja 1ª consulta foi marcada como procedimento, paciente da base (retorno) ou sem histórico.',
+      'Marketing: o paciente fez Avaliação Meta, Google ou Urgência Google antes de comprar, em qualquer tempo (é a base do CAC). As vendas com avaliação há mais de 120 dias aparecem na nota da linha e ficam fora da taxa de aprovação.',
+      'Outras origens: paciente novo cuja 1ª consulta foi marcada como procedimento, base de pacientes (retorno), avaliação de outra origem, reavaliação ou sem histórico.',
       'Conta pacientes por dia. Este quadro não muda com o filtro de avaliação.'],
     tempos: ['Medianas por lead (a única parte que segue cada pessoa), entre os leads do período que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
     semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
@@ -645,7 +646,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       `<div><span class="dash-mini-rotulo">Aprovado</span><b>${reaisCurto(e.aprovado.v)} <small>${e.orcamento.v ? pct(e.aprovado.v, e.orcamento.v, 0) + ' do orçado' : ''}</small></b></div>` +
       `<div><span class="dash-mini-rotulo">Ticket aprovado</span><b>${e.aprovado.q ? reais(ticket) : '—'}</b></div>` +
       `<div><span class="dash-mini-rotulo">Faltaram</span><b>${n(e.faltou.q)} <small>${e.prevista.q ? pct(e.faltou.q, e.prevista.q, 0) + ' das previstas' : ''}</small></b></div>` +
-      `<div><span class="dash-mini-rotulo com-dica">Aprovado fora do funil<span data-dica-local="casa"></span></span><b>${reaisCurto(e.casa.v)} <small>${plural(e.casa.q, 'aprovado', 'aprovados')}</small></b></div>`;
+      `<div><span class="dash-mini-rotulo com-dica">Vendas de outras origens<span data-dica-local="casa"></span></span><b>${reaisCurto(e.casa.v)} <small>${plural(e.casa.q, 'aprovado', 'aprovados')}</small></b></div>`;
     ligarDicas($('valores'));
   }
 
@@ -654,21 +655,24 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const caixa = $('rastreio'); if (!caixa) return;
     const [a, b] = iv;
     const oi = estado.origem === 'todas' ? null : D.origens.findIndex((o) => o.id === estado.origem);
-    const funil = nomesAval().map(() => ({ q: 0, v: 0 })), fora = (D.categoriasFora || []).map(() => ({ q: 0, v: 0 }));
+    const mk = nomesAval().map(() => ({ q: 0, v: 0, ql: 0, vl: 0 })), fora = (D.categoriasFora || []).map(() => ({ q: 0, v: 0 }));
     for (const [h, o, tipo, q, v, k] of D.eventos || []) {
       const d = h.slice(0, 10);
       if (d < a || d > b || (oi != null && o !== oi)) continue;
-      const alvo = tipo === 'aprovado' ? funil[k] : tipo === 'casa' ? fora[k] : null;
-      if (alvo) { alvo.q += q; alvo.v += v; }
+      if (tipo === 'aprovado' && mk[k]) { mk[k].q += q; mk[k].v += v; }
+      else if (tipo === 'aprovado_longo' && mk[k]) { mk[k].q += q; mk[k].v += v; mk[k].ql += q; mk[k].vl += v; }
+      else if (tipo === 'casa' && fora[k]) { fora[k].q += q; fora[k].v += v; }
     }
     const soma = (xs) => xs.reduce((t, x) => ({ q: t.q + x.q, v: t.v + x.v }), { q: 0, v: 0 });
-    const tf = soma(funil), to = soma(fora), tot = { q: tf.q + to.q, v: tf.v + to.v };
-    const linha = (nome, x, classe) => `<tr><td>${esc(nome)}</td><td>${n(x.q)}</td><td>${reais(x.v)}</td>` +
+    const tm = soma(mk), to = soma(fora), tot = { q: tm.q + to.q, v: tm.v + to.v };
+    const longo = mk.reduce((t, x) => t + x.ql, 0);
+    const linha = (nome, x, classe, nota = '') => `<tr><td>${esc(nome)}${nota}</td><td>${n(x.q)}</td><td>${reais(x.v)}</td>` +
       `<td class="parte"><div class="parte-barra ${classe}"><span><i style="width:${tot.v ? (100 * x.v / tot.v).toFixed(1) : 0}%"></i></span><b>${tot.v ? pct(x.v, tot.v, 0) : '—'}</b></div></td></tr>`;
     const grupo = (nome, x) => `<tr class="grupo-linha"><td class="grupo" colspan="4">${esc(nome)} · ${plural(x.q, 'venda', 'vendas')} · ${reais(x.v)} · ${tot.v ? pct(x.v, tot.v, 0) : '—'}</td></tr>`;
+    const notaLonga = (x) => x.ql ? ` <span class="sutil">· ${n(x.ql)} com avaliação há mais de 120 dias</span>` : '';
     caixa.innerHTML = `<table class="tabela rastreio"><thead><tr><th>Origem da venda</th><th>Vendas</th><th>Valor</th><th>Parte do valor</th></tr></thead><tbody>` +
-      grupo('Do funil: avaliação de anúncio', tf) + nomesAval().map((nome, i) => linha(nome, funil[i], '')).join('') +
-      grupo('Fora do funil', to) + (D.categoriasFora || []).map((nome, i) => linha(nome, fora[i], 'fora')).join('') +
+      grupo('Marketing (avaliação de anúncio)', tm) + nomesAval().map((nome, i) => linha(nome, mk[i], '', notaLonga(mk[i]))).join('') +
+      grupo('Outras origens', to) + (D.categoriasFora || []).map((nome, i) => linha(nome, fora[i], 'fora')).join('') +
       `</tbody><tfoot><tr><td>Total vendido</td><td>${n(tot.q)}</td><td>${reais(tot.v)}</td><td></td></tr></tfoot></table>`;
     $('rastreio-total').textContent = '';
   }
