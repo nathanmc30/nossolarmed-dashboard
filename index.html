@@ -244,6 +244,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .dash-hbarra { grid-template-columns: 104px minmax(0, 1fr) 36px 46px; gap: 8px; }
   .dash-colunas.eixo span:nth-child(even) { visibility: hidden; }
 }
+/* ---------------------------------------------------------------- rastreio das vendas */
+.rastreio td.grupo { padding-top: 14px; font-size: 12px; font-weight: 600; color: var(--texto-3); border-bottom: 1px solid var(--borda); cursor: default; }
+.rastreio tbody tr.grupo-linha { cursor: default; }
+.rastreio tbody tr.grupo-linha:hover { background: none; }
+.rastreio td.parte { width: 34%; min-width: 140px; }
+.rastreio .parte-barra { display: grid; grid-template-columns: minmax(0, 1fr) 46px; align-items: center; gap: 10px; }
+.rastreio .parte-barra span { height: 8px; background: var(--trilho); border-radius: 0 4px 4px 0; }
+.rastreio .parte-barra i { display: block; height: 100%; min-width: 2px; border-radius: 0 4px 4px 0; background: var(--serie-1); }
+.rastreio .parte-barra.fora i { background: var(--passo-nao); }
+.rastreio .parte-barra b { font-weight: 500; font-size: 12px; color: var(--texto-3); text-align: right; }
+.rastreio td:first-child { white-space: normal; }
+.rastreio tbody tr { cursor: default; }
+
 /* ---------------------------------------------------------------- datas personalizadas e estado do dado */
 .dash-datas { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--texto-3); }
 .dash-datas[hidden] { display: none; }
@@ -291,6 +304,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
     </section>
   </div>
 
+  <section class="dash-secao">
+    <div class="dash-secao-topo"><h2 class="com-dica">Rastreio das vendas<span data-dica="rastreio"></span></h2><span class="dash-estado" id="rastreio-total"></span></div>
+    <div class="tabela-rolagem" id="rastreio"></div>
+  </section>
 </main>
 <div class="dash-tip" id="tip" role="tooltip"></div>
 
@@ -397,6 +414,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
     comparecimento: ['Avaliações atendidas no período ÷ avaliações que estavam marcadas para o período e já passaram (atendidas, faltas e sem status). Canceladas não entram.'],
     aprovacao: ['Orçamentos aprovados no período ÷ avaliações atendidas no período, mesmo que não sejam as mesmas pessoas.'],
     casa: ['Orçamentos aprovados no período de quem não fez avaliação Meta, Google ou Urgência Google nos 120 dias anteriores: paciente da casa em tratamento ou avaliação de outra origem (Indicação, Outdoor…).'],
+    rastreio: ['Toda venda (orçamento aprovado) do período, classificada pelo histórico do paciente na agenda do Clinicorp. O total bate com o aprovado no Clinicorp.',
+      'Do funil: fez Avaliação Meta, Google ou Urgência Google nos 120 dias antes do orçamento. Fora do funil: avaliação mais antiga, de outra origem, reavaliação, paciente novo cuja 1ª consulta foi marcada como procedimento, paciente da base (retorno) ou sem histórico.',
+      'Conta pacientes por dia. Este quadro não muda com o filtro de avaliação.'],
     tempos: ['Medianas por lead (a única parte que segue cada pessoa), entre os leads do período que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
     semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
       () => `Leads dos últimos ${D.maturacaoDias} dias ainda estão em maturação: parte deles ainda vai agendar ou aprovar.`],
@@ -629,6 +649,30 @@ button { font: inherit; color: inherit; cursor: pointer; }
     ligarDicas($('valores'));
   }
 
+  // ------------------------------------------------------------ rastreio das vendas (ignora o filtro de avaliação)
+  function desenharRastreio(iv) {
+    const caixa = $('rastreio'); if (!caixa) return;
+    const [a, b] = iv;
+    const oi = estado.origem === 'todas' ? null : D.origens.findIndex((o) => o.id === estado.origem);
+    const funil = nomesAval().map(() => ({ q: 0, v: 0 })), fora = (D.categoriasFora || []).map(() => ({ q: 0, v: 0 }));
+    for (const [h, o, tipo, q, v, k] of D.eventos || []) {
+      const d = h.slice(0, 10);
+      if (d < a || d > b || (oi != null && o !== oi)) continue;
+      const alvo = tipo === 'aprovado' ? funil[k] : tipo === 'casa' ? fora[k] : null;
+      if (alvo) { alvo.q += q; alvo.v += v; }
+    }
+    const soma = (xs) => xs.reduce((t, x) => ({ q: t.q + x.q, v: t.v + x.v }), { q: 0, v: 0 });
+    const tf = soma(funil), to = soma(fora), tot = { q: tf.q + to.q, v: tf.v + to.v };
+    const linha = (nome, x, classe) => `<tr><td>${esc(nome)}</td><td>${n(x.q)}</td><td>${reais(x.v)}</td>` +
+      `<td class="parte"><div class="parte-barra ${classe}"><span><i style="width:${tot.v ? (100 * x.v / tot.v).toFixed(1) : 0}%"></i></span><b>${tot.v ? pct(x.v, tot.v, 0) : '—'}</b></div></td></tr>`;
+    const grupo = (nome, x) => `<tr class="grupo-linha"><td class="grupo" colspan="4">${esc(nome)} · ${plural(x.q, 'venda', 'vendas')} · ${reais(x.v)} · ${tot.v ? pct(x.v, tot.v, 0) : '—'}</td></tr>`;
+    caixa.innerHTML = `<table class="tabela rastreio"><thead><tr><th>Origem da venda</th><th>Vendas</th><th>Valor</th><th>Parte do valor</th></tr></thead><tbody>` +
+      grupo('Do funil: avaliação de anúncio', tf) + nomesAval().map((nome, i) => linha(nome, funil[i], '')).join('') +
+      grupo('Fora do funil', to) + (D.categoriasFora || []).map((nome, i) => linha(nome, fora[i], 'fora')).join('') +
+      `</tbody><tfoot><tr><td>Total vendido</td><td>${n(tot.q)}</td><td>${reais(tot.v)}</td><td></td></tr></tfoot></table>`;
+    $('rastreio-total').textContent = '';
+  }
+
   // ------------------------------------------------------------ tempos
   function desenharTempos(r) {
     const t = r.tempos;
@@ -738,7 +782,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function desenhar() {
     const iv = intervalo();
     const r = resumo(linhasDe(iv, estado.origem));
-    desenharPeriodo(); desenharOrigem(); desenharAvaliacao(); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharAtualizado(); // gráfico no tempo e tabela por origem fora da tela por ora (pedido de 10/10)
+    desenharPeriodo(); desenharOrigem(); desenharAvaliacao(); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharRastreio(iv); desenharAtualizado(); // gráfico no tempo e tabela por origem fora da tela por ora (pedido de 10/10)
     document.title = `Funil comercial · ${nomeIntervalo(iv)} · NossoLarMed`;
   }
   if (!D || !D.linhas) D = { linhas: [], origens: D?.origens || [], aguardandoAceite: [], maturacaoDias: 21, extraidoEm: new Date(0).toISOString(), primeiroDia: null };
