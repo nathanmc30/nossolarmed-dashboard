@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#efebe5">
 <meta name="color-scheme" content="light">
-<title>Funil comercial · NossoLarMed</title>
+<title>Comercial · NossoLarMed</title>
 <script>
   // Mesmo esquema do Aspekto Business: claro é o padrão, só quem salvou 'escuro' vê o escuro.
   try {
@@ -30,7 +30,7 @@
   --texto: #ffffff; --texto-2: rgba(255, 255, 255, 0.65); --texto-3: rgba(255, 255, 255, 0.45); --texto-4: rgba(255, 255, 255, 0.3);
   --texto-forte: #ffffff; --marca: #6baed5; --marca-texto: #9ed0ed; --marca-suave: rgba(107, 174, 213, 0.14);
   --marca-anel: rgba(107, 174, 213, 0.18); --alerta: #e7b864;
-  --serie-1: #3987e5;
+  --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; /* paleta categórica validada do CRM (dashboard.css) */
   /* onde o lead parou: rampa ordinal de um azul só (validada), o neutro é quem não agendou */
   --passo-aprovou: #9cc3f2; --passo-veio: #4d8fe0; --passo-agendou: #1f5ca8; --passo-nao: rgba(255, 255, 255, 0.16);
   --trilho: rgba(255, 255, 255, 0.035);
@@ -44,7 +44,7 @@
   --texto: #2a292a; --texto-2: rgba(42, 41, 42, 0.82); --texto-3: rgba(42, 41, 42, 0.68); --texto-4: rgba(42, 41, 42, 0.55);
   --texto-forte: #151415; --marca: #22385d; --marca-texto: #22385d; --marca-suave: rgba(107, 174, 213, 0.2);
   --marca-anel: rgba(107, 174, 213, 0.38); --alerta: #9a6710;
-  --serie-1: #2a78d6;
+  --serie-1: #2a78d6; --serie-2: #eb6834; --serie-3: #1baf7a;
   --passo-aprovou: #1d5199; --passo-veio: #3f7fd4; --passo-agendou: #7eaeea; --passo-nao: rgba(42, 41, 42, 0.13);
   --trilho: rgba(42, 41, 42, 0.04);
 }
@@ -96,6 +96,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .seletor-rotulo:focus-visible { outline: none; border-color: var(--marca); box-shadow: 0 0 0 4px var(--marca-anel); }
 .seletor-rotulo svg { color: var(--texto-4); transition: transform var(--t); flex: none; }
 .seletor-rotulo.aberto svg { transform: rotate(180deg); }
+.seletor-rotulo[hidden] { display: none; }
 .seletor-rotulo span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .menu {
@@ -244,6 +245,19 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .dash-hbarra { grid-template-columns: 104px minmax(0, 1fr) 36px 46px; gap: 8px; }
   .dash-colunas.eixo span:nth-child(even) { visibility: hidden; }
 }
+/* ---------------------------------------------------------------- abas: onde estou (sublinhadas, como no Pipeline do CRM) */
+.dash-abas { display: flex; align-items: stretch; gap: 4px; align-self: stretch; margin-left: 8px; }
+.dash-aba {
+  display: inline-flex; align-items: center; padding: 0 10px; border: none; background: none; font-size: 13.5px; font-weight: 500;
+  color: var(--texto-3); border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color var(--t), border-color var(--t);
+}
+.dash-aba:hover { color: var(--texto); }
+.dash-aba.on { color: var(--texto-forte); border-bottom-color: var(--marca); font-weight: 600; }
+.dash-aba:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--marca-anel); border-radius: 6px; }
+.dash-legenda i.cor-reg { width: 10px; height: 10px; border-radius: 2px; }
+.leads-mes td:first-child { min-width: 90px; }
+@media (max-width: 720px) { .dash-abas { order: 3; width: 100%; margin-left: -10px; } }
+
 /* ---------------------------------------------------------------- rastreio das vendas */
 .rastreio td.grupo { padding-top: 14px; font-size: 12px; font-weight: 600; color: var(--texto-3); border-bottom: 1px solid var(--borda); cursor: default; }
 .rastreio tbody tr.grupo-linha { cursor: default; }
@@ -274,8 +288,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <main class="tela">
   <div class="dash-topo">
     <nav class="dash-nav">
-      <h1>Funil comercial</h1>
+      <h1>Comercial</h1>
       <span class="dash-cliente">NossoLarMed</span>
+      <div class="dash-abas" role="tablist" aria-label="Tela">
+        <button class="dash-aba" type="button" role="tab" data-aba="funil">Funil</button>
+        <button class="dash-aba" type="button" role="tab" data-aba="leads">Leads</button>
+      </div>
       <span class="espaco"></span>
       <span class="dash-atualizado" id="atualizado"></span>
       <button class="btn-icone" id="tema" type="button" aria-label="Trocar tema"></button>
@@ -290,6 +308,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     </div>
   </div>
 
+  <div id="aba-funil">
   <section class="dash-kpis" id="kpis" aria-label="Indicadores"></section>
 
   <div class="dash-duas">
@@ -308,6 +327,27 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <div class="dash-secao-topo"><h2 class="com-dica">Rastreio das vendas<span data-dica="rastreio"></span></h2><span class="dash-estado" id="rastreio-total"></span></div>
     <div class="tabela-rolagem" id="rastreio"></div>
   </section>
+  </div>
+
+  <div id="aba-leads" hidden>
+    <section class="dash-kpis" id="kpis-leads" aria-label="Leads por região"></section>
+    <section class="dash-secao">
+      <div class="dash-secao-topo"><h2 class="com-dica"><span id="titulo-leads-tempo">Leads</span><span data-dica="leadsTempo"></span></h2></div>
+      <div class="dash-legenda" id="legenda-leads"></div>
+      <div class="dash-colunas-caixa" id="leads-tempo"></div>
+      <details class="dash-tabela-ver"><summary>Ver em tabela</summary><div class="tabela-rolagem" id="leads-tempo-tabela"></div></details>
+    </section>
+    <div class="dash-duas">
+      <section class="dash-secao">
+        <div class="dash-secao-topo"><h2 class="com-dica">Por mês<span data-dica="leadsMes"></span></h2></div>
+        <div class="tabela-rolagem" id="leads-mes"></div>
+      </section>
+      <section class="dash-secao">
+        <div class="dash-secao-topo"><h2 class="com-dica">Outros estados<span data-dica="leadsUF"></span></h2></div>
+        <div class="tabela-rolagem" id="leads-uf"></div>
+      </section>
+    </div>
+  </div>
 </main>
 <div class="dash-tip" id="tip" role="tooltip"></div>
 
@@ -418,6 +458,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
       'Marketing: o paciente fez Avaliação Meta, Google ou Urgência Google antes de comprar, em qualquer tempo (é a base do CAC). As vendas com avaliação há mais de 120 dias aparecem na nota da linha e ficam fora da taxa de aprovação.',
       'Outras origens: paciente novo cuja 1ª consulta foi marcada como procedimento, base de pacientes (retorno), avaliação de outra origem, reavaliação ou sem histórico.',
       'Conta pacientes por dia. Este quadro não muda com o filtro de avaliação.'],
+    leadsTempo: ['Leads criados no Kommo, pela hora em que chegaram, separados pelo DDD do telefone. Florianópolis = DDD 48; interior de SC = 47 e 49; outros estados = qualquer outro DDD do Brasil.',
+      'O DDD 48 também cobre o sul do estado (Criciúma, Tubarão, Laguna), que fica junto com Florianópolis.'],
+    leadsMes: ['Todos os meses desde o início do Kommo, com o filtro de origem aplicado. Não muda com o período.'],
+    leadsUF: ['Leads de outros estados no período, pelo estado do DDD.'],
     tempos: ['Medianas por lead (a única parte que segue cada pessoa), entre os leads do período que chegaram ao passo. Contam desde a criação do lead no Kommo.'],
     semanas: ['Cada coluna é o período em que o lead chegou; a cor diz até onde ele foi.',
       () => `Leads dos últimos ${D.maturacaoDias} dias ainda estão em maturação: parte deles ainda vai agendar ou aprovar.`],
@@ -677,6 +721,84 @@ button { font: inherit; color: inherit; cursor: pointer; }
     $('rastreio-total').textContent = '';
   }
 
+  // ------------------------------------------------------------ aba Leads: região pelo DDD
+  const REGIOES = [
+    { nome: 'Florianópolis', sub: 'DDD 48', cor: '--serie-1' },
+    { nome: 'Interior de SC', sub: 'DDD 47 e 49', cor: '--serie-2' },
+    { nome: 'Outros estados', sub: 'outros DDDs do Brasil', cor: '--serie-3' },
+    { nome: 'Exterior ou sem telefone', sub: '', cor: '--passo-nao' },
+  ];
+  const regiaoDe = (ddd) => ddd === '48' ? 0 : ddd === '47' || ddd === '49' ? 1 : /^\d\d$/.test(ddd) ? 2 : 3;
+  const UF = {};
+  for (const [uf, ds] of Object.entries({ SP: '11 12 13 14 15 16 17 18 19', RJ: '21 22 24', ES: '27 28', MG: '31 32 33 34 35 37 38', PR: '41 42 43 44 45 46',
+    SC: '47 48 49', RS: '51 53 54 55', DF: '61', GO: '62 64', TO: '63', MT: '65 66', MS: '67', AC: '68', RO: '69', BA: '71 73 74 75 77', SE: '79',
+    PE: '81 87', AL: '82', PB: '83', RN: '84', CE: '85 88', PI: '86 89', PA: '91 93 94', AM: '92 97', RR: '95', AP: '96', MA: '98 99' })) for (const d of ds.split(' ')) UF[d] = uf;
+  function linhasLeads([a, b]) {
+    const oi = estado.origem === 'todas' ? null : D.origens.findIndex((o) => o.id === estado.origem);
+    return (D.leadsDDD || []).filter(([h, o]) => { const d = h.slice(0, 10); return d >= a && d <= b && (oi == null || o === oi); });
+  }
+  const porRegiao = (ls) => { const r = [0, 0, 0, 0]; for (const [, , d, q] of ls) r[regiaoDe(d)] += q; return r; };
+  function desenharLeads(iv) {
+    const css = getComputedStyle(document.documentElement);
+    const cores = REGIOES.map((g) => css.getPropertyValue(g.cor).trim());
+    const ls = linhasLeads(iv), r = porRegiao(ls), tot = r.reduce((x, y) => x + y, 0);
+    const kpi = (rotulo, valor, sub) => `<div class="dash-kpi"><span class="dash-kpi-rotulo">${rotulo}</span><b>${valor}</b><span class="dash-kpi-sub">${sub}</span></div>`;
+    $('kpis-leads').innerHTML = kpi('Leads', n(tot), (estado.origem === 'todas' ? 'criados no Kommo' : esc(nomeOrigem(estado.origem))) + aguardando(iv)) +
+      REGIOES.map((g, i) => kpi(g.nome, n(r[i]), `${tot ? pct(r[i], tot) : '—'}${g.sub ? ' · ' + g.sub : ''}`)).join('');
+
+    // no tempo: por hora (1 dia), por dia (até 45) ou por semana — os mesmos baldes do funil
+    $('legenda-leads').innerHTML = REGIOES.map((g, i) => `<span><i class="cor-reg" style="background:${cores[i]}"></i>${g.nome}</span>`).join('');
+    const { tipo, lista } = baldes(iv);
+    $('titulo-leads-tempo').textContent = 'Leads por ' + tipo;
+    const ss = lista.map((bk) => ({ ...bk, r: porRegiao(ls.filter(bk.casa)) })).map((x) => ({ ...x, tot: x.r.reduce((a2, b2) => a2 + b2, 0) }));
+    const max = Math.max(1, ...ss.map((x) => x.tot));
+    const bruto = Math.max(max / 4, 1), ordem = 10 ** Math.floor(Math.log10(bruto)), f = bruto / ordem;
+    const passo = (f > 5 ? 10 : f > 2 ? 5 : f > 1 ? 2 : 1) * ordem;
+    const grades = []; for (let v = passo; v <= max; v += passo) grades.push(v);
+    const colunas = ss.map((x) => {
+      const t = `<div class="dash-tip-titulo">${x.titulo}</div>` + REGIOES.map((g, i) => linhaTip(cores[i], `${n(x.r[i])} <span class="sutil">${pct(x.r[i], x.tot, 0)}</span>`, g.nome)).join('') +
+        `<div class="dash-tip-nota">${leadsN(x.tot)}</div>`;
+      const partes = x.r.map((q, i) => q ? `<i style="flex:${q} 1 0;background:${cores[i]}"></i>` : '').join('');
+      return `<div class="dash-coluna" data-tip="${esc(t)}"><div class="dash-coluna-pilha" style="height:${(100 * x.tot / max).toFixed(2)}%">${partes}</div></div>`;
+    }).join('');
+    const cada = Math.ceil(ss.length / 14);
+    $('leads-tempo').innerHTML =
+      `<div class="dash-colunas plot" style="--n:${ss.length}">${grades.map((v) => `<div class="dash-grade" style="bottom:${(100 * v / max).toFixed(2)}%"><span>${v}</span></div>`).join('')}${colunas}</div>` +
+      `<div class="dash-colunas eixo" style="--n:${ss.length}">${ss.map((x, i) => `<span>${i % cada === 0 ? x.rotulo : ''}</span>`).join('')}</div>`;
+    const cab = tipo === 'hora' ? 'Hora' : tipo === 'dia' ? 'Dia' : 'Semana';
+    $('leads-tempo-tabela').innerHTML = `<table class="tabela"><thead><tr><th>${cab}</th><th>Leads</th>${REGIOES.map((g) => `<th>${g.nome}</th>`).join('')}</tr></thead><tbody>` +
+      ss.map((x) => `<tr><td>${x.rotulo}</td><td>${n(x.tot)}</td>${x.r.map((q) => `<td>${n(q)}<span class="pct-n">${pct(q, x.tot, 0)}</span></td>`).join('')}</tr>`).join('') + '</tbody></table>';
+
+    // por mês: todos os meses (não depende do período)
+    const meses = new Map();
+    for (const [h, o, d, q] of linhasLeads([D.primeiroDia || '2000-01-01', hoje()])) {
+      const m = h.slice(0, 7); const x = meses.get(m) || [0, 0, 0, 0]; x[regiaoDe(d)] += q; meses.set(m, x);
+    }
+    const NOMES_MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const linhaMes = (rot, x) => { const t = x.reduce((a2, b2) => a2 + b2, 0); return `<tr><td>${rot}</td><td>${n(t)}</td>${x.map((q) => `<td>${n(q)}<span class="pct-n">${pct(q, t, 0)}</span></td>`).join('')}</tr>`; };
+    const somaMeses = [...meses.values()].reduce((a2, x) => a2.map((v, i) => v + x[i]), [0, 0, 0, 0]);
+    $('leads-mes').innerHTML = `<table class="tabela leads-mes"><thead><tr><th>Mês</th><th>Leads</th><th>Florianópolis</th><th>Interior de SC</th><th>Outros estados</th><th>Exterior ou sem tel.</th></tr></thead><tbody>` +
+      [...meses].sort((x, y) => (x[0] < y[0] ? 1 : -1)).map(([m, x]) => linhaMes(`${NOMES_MES[+m.slice(5, 7) - 1]}/${m.slice(2, 4)}`, x)).join('') +
+      `</tbody><tfoot>${linhaMes('Total', somaMeses)}</tfoot></table>`;
+
+    // outros estados no período, por UF
+    const ufs = {};
+    for (const [, , d, q] of ls) if (regiaoDe(d) === 2) { const u = UF[d] || `DDD ${d}`; ufs[u] = (ufs[u] || 0) + q; }
+    const lu = Object.entries(ufs).sort((x, y) => y[1] - x[1]);
+    $('leads-uf').innerHTML = lu.length
+      ? `<table class="tabela"><thead><tr><th>Estado</th><th>Leads</th><th>Dos de fora</th></tr></thead><tbody>` +
+        lu.map(([u, q]) => `<tr><td>${esc(u)}</td><td>${n(q)}</td><td>${pct(q, r[2], 0)}</td></tr>`).join('') + '</tbody></table>'
+      : '<p class="sutil" style="margin:0;font-size:13px">Nenhum lead de outro estado no período.</p>';
+  }
+
+  // ------------------------------------------------------------ abas
+  const abaAtual = () => (location.hash === '#leads' ? 'leads' : 'funil');
+  document.querySelectorAll('.dash-aba').forEach((b) => b.addEventListener('click', () => {
+    history.replaceState(null, '', b.dataset.aba === 'leads' ? '#leads' : location.pathname + location.search);
+    desenhar();
+  }));
+  addEventListener('hashchange', () => desenhar());
+
   // ------------------------------------------------------------ tempos
   function desenharTempos(r) {
     const t = r.tempos;
@@ -784,10 +906,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   // ------------------------------------------------------------ tudo
   function desenhar() {
-    const iv = intervalo();
-    const r = resumo(linhasDe(iv, estado.origem));
-    desenharPeriodo(); desenharOrigem(); desenharAvaliacao(); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharRastreio(iv); desenharAtualizado(); // gráfico no tempo e tabela por origem fora da tela por ora (pedido de 10/10)
-    document.title = `Funil comercial · ${nomeIntervalo(iv)} · NossoLarMed`;
+    const iv = intervalo(), aba = abaAtual();
+    document.querySelectorAll('.dash-aba').forEach((b) => { b.classList.toggle('on', b.dataset.aba === aba); b.setAttribute('aria-selected', b.dataset.aba === aba); });
+    $('aba-funil').hidden = aba !== 'funil'; $('aba-leads').hidden = aba !== 'leads';
+    $('avaliacao').hidden = aba !== 'funil'; // o tipo de avaliação não se aplica à aba Leads
+    desenharPeriodo(); desenharOrigem(); desenharAvaliacao(); desenharAtualizado();
+    if (aba === 'leads') desenharLeads(iv);
+    else { const r = resumo(linhasDe(iv, estado.origem)); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharRastreio(iv); }
+    document.title = `${aba === 'leads' ? 'Leads' : 'Funil'} · ${nomeIntervalo(iv)} · NossoLarMed`;
   }
   if (!D || !D.linhas) D = { linhas: [], origens: D?.origens || [], aguardandoAceite: [], maturacaoDias: 21, extraidoEm: new Date(0).toISOString(), primeiroDia: null };
   desenhar();
