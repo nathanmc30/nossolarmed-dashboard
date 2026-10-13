@@ -245,6 +245,37 @@ button { font: inherit; color: inherit; cursor: pointer; }
   .dash-hbarra { grid-template-columns: 104px minmax(0, 1fr) 36px 46px; gap: 8px; }
   .dash-colunas.eixo span:nth-child(even) { visibility: hidden; }
 }
+/* ---------------------------------------------------------------- popup da lista de vendas */
+.rastreio tbody tr.clicavel, .rastreio tbody tr.grupo-linha.clicavel { cursor: pointer; }
+.rastreio tbody tr.clicavel:hover td { background: var(--sup); }
+.modal-fundo { position: fixed; inset: 0; z-index: 100; background: rgba(0, 0, 0, 0.45); display: grid; place-items: center; padding: 16px; }
+[data-tema='claro'] .modal-fundo { background: rgba(42, 41, 42, 0.28); }
+.modal {
+  width: min(980px, 100%); max-height: min(82vh, 820px); display: flex; flex-direction: column; border-radius: 14px;
+  background: var(--opaco); border: 1px solid var(--borda); box-shadow: 0 30px 100px rgba(0, 0, 0, 0.5);
+}
+[data-tema='claro'] .modal { background: #fff; box-shadow: 0 30px 100px rgba(34, 56, 93, 0.18); }
+.modal-topo { display: flex; align-items: center; gap: 10px; padding: 16px 18px 12px; border-bottom: 1px solid var(--borda-fraca); }
+.modal-topo h3 { margin: 0; font-size: 15px; font-weight: 600; flex: 1; }
+.modal-topo .sutil { font-size: 12.5px; }
+.modal-corpo { overflow: auto; padding: 4px 18px 16px; }
+.modal-pe { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 18px; border-top: 1px solid var(--borda-fraca); font-size: 12.5px; color: var(--texto-3); }
+.modal-pe button { border: none; background: none; color: var(--texto-3); font-size: 12.5px; padding: 0; }
+.modal-pe button:hover { color: var(--texto); text-decoration: underline; }
+.modal .tabela td:first-child { min-width: 0; }
+.modal .tabela td { white-space: normal; }
+.modal .tabela td.num { white-space: nowrap; }
+.venda-ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+.venda-selo { display: inline-block; margin-left: 6px; font-size: 11px; color: var(--alerta); white-space: nowrap; }
+.senha-form { display: flex; flex-direction: column; gap: 10px; padding: 18px 0 6px; max-width: 360px; }
+.senha-form input {
+  height: 34px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--borda); background: var(--sup); color: var(--texto); font: inherit;
+}
+.senha-form input:focus-visible { outline: none; border-color: var(--marca); box-shadow: 0 0 0 4px var(--marca-anel); }
+.senha-form button { align-self: flex-start; height: 32px; padding: 0 14px; border-radius: 9px; border: none; background: var(--marca); color: var(--sobre-marca, #fff); font-weight: 600; }
+[data-tema='claro'] .senha-form button { color: #fff; }
+.senha-erro { font-size: 12.5px; color: var(--alerta); min-height: 18px; }
+
 /* ---------------------------------------------------------------- abas: onde estou (sublinhadas, como no Pipeline do CRM) */
 .dash-abas { display: flex; align-items: stretch; gap: 4px; align-self: stretch; margin-left: 8px; }
 .dash-aba {
@@ -455,6 +486,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
     aprovacao: ['Orçamentos aprovados no período ÷ avaliações atendidas no período, mesmo que não sejam as mesmas pessoas.'],
     casa: ['Vendas do período de quem nunca fez avaliação de anúncio: base de pacientes, avaliação de outra origem (Indicação, Outdoor…) ou paciente novo marcado como procedimento. O detalhe está no Rastreio das vendas.'],
     rastreio: ['Toda venda (orçamento aprovado) do período, classificada pelo histórico do paciente na agenda do Clinicorp. O total bate com o aprovado no Clinicorp.',
+      'Clique numa linha para ver quem comprou. A lista é protegida por senha.',
       'Marketing: o paciente fez Avaliação Meta, Google ou Urgência Google antes de comprar, em qualquer tempo (é a base do CAC). As vendas com avaliação há mais de 120 dias aparecem na nota da linha e ficam fora da taxa de aprovação.',
       'Outras origens: paciente novo cuja 1ª consulta foi marcada como procedimento, base de pacientes (retorno), avaliação de outra origem, reavaliação ou sem histórico.',
       'Conta pacientes por dia. Este quadro não muda com o filtro de avaliação.'],
@@ -710,16 +742,97 @@ button { font: inherit; color: inherit; cursor: pointer; }
     const soma = (xs) => xs.reduce((t, x) => ({ q: t.q + x.q, v: t.v + x.v }), { q: 0, v: 0 });
     const tm = soma(mk), to = soma(fora), tot = { q: tm.q + to.q, v: tm.v + to.v };
     const longo = mk.reduce((t, x) => t + x.ql, 0);
-    const linha = (nome, x, classe, nota = '') => `<tr><td>${esc(nome)}${nota}</td><td>${n(x.q)}</td><td>${reais(x.v)}</td>` +
+    const linha = (nome, x, classe, nota = '', g = '') => `<tr class="clicavel" data-g="${g}" data-nome="${esc(nome)}" title="Ver quem comprou"><td>${esc(nome)}${nota}</td><td>${n(x.q)}</td><td>${reais(x.v)}</td>` +
       `<td class="parte"><div class="parte-barra ${classe}"><span><i style="width:${tot.v ? (100 * x.v / tot.v).toFixed(1) : 0}%"></i></span><b>${tot.v ? pct(x.v, tot.v, 0) : '—'}</b></div></td></tr>`;
-    const grupo = (nome, x) => `<tr class="grupo-linha"><td class="grupo" colspan="4">${esc(nome)} · ${plural(x.q, 'venda', 'vendas')} · ${reais(x.v)} · ${tot.v ? pct(x.v, tot.v, 0) : '—'}</td></tr>`;
+    const grupo = (nome, x, g) => `<tr class="grupo-linha clicavel" data-g="${g}" data-nome="${esc(nome)}" title="Ver quem comprou"><td class="grupo" colspan="4">${esc(nome)} · ${plural(x.q, 'venda', 'vendas')} · ${reais(x.v)} · ${tot.v ? pct(x.v, tot.v, 0) : '—'}</td></tr>`;
     const notaLonga = (x) => x.ql ? ` <span class="sutil">· ${n(x.ql)} com avaliação há mais de 120 dias</span>` : '';
     caixa.innerHTML = `<table class="tabela rastreio"><thead><tr><th>Origem da venda</th><th>Vendas</th><th>Valor</th><th>Parte do valor</th></tr></thead><tbody>` +
-      grupo('Marketing (avaliação de anúncio)', tm) + nomesAval().map((nome, i) => linha(nome, mk[i], '', notaLonga(mk[i]))).join('') +
-      grupo('Outras origens', to) + (D.categoriasFora || []).map((nome, i) => linha(nome, fora[i], 'fora')).join('') +
-      `</tbody><tfoot><tr><td>Total vendido</td><td>${n(tot.q)}</td><td>${reais(tot.v)}</td><td></td></tr></tfoot></table>`;
+      grupo('Marketing (avaliação de anúncio)', tm, 'mk') + nomesAval().map((nome, i) => linha(nome, mk[i], '', notaLonga(mk[i]), `mk:${i}`)).join('') +
+      grupo('Outras origens', to, 'fora') + (D.categoriasFora || []).map((nome, i) => linha(nome, fora[i], 'fora', '', `fora:${i}`)).join('') +
+      `</tbody><tfoot><tr class="clicavel" data-g="" data-nome="Todas as vendas" title="Ver quem comprou"><td>Total vendido</td><td>${n(tot.q)}</td><td>${reais(tot.v)}</td><td></td></tr></tfoot></table>`;
     $('rastreio-total').textContent = '';
   }
+
+  // ------------------------------------------------------------ popup: quem comprou (lista criptografada)
+  // vendas.enc.json: AES-256-GCM, chave PBKDF2-SHA256 (200 mil voltas) da senha do dono. A senha fica só neste navegador.
+  const CHAVE_SENHA = 'nossolarmed:senha-vendas';
+  let vendas = null, vendasDe = null;
+  const b64 = (x) => Uint8Array.from(atob(x), (c) => c.charCodeAt(0));
+  async function abrirVendas(senha) {
+    const r = await fetch('vendas.enc.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error('arquivo');
+    const enc = await r.json();
+    if (vendas && vendasDe === enc.dados.slice(0, 32)) return vendas;
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, ['deriveKey']);
+    const chave = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b64(enc.sal), iterations: 200000, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const claro = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(enc.iv) }, chave, b64(enc.dados)); // falha = senha errada
+    vendas = JSON.parse(new TextDecoder().decode(claro)); vendasDe = enc.dados.slice(0, 32);
+    return vendas;
+  }
+  let modal = null;
+  function fecharModal() { if (modal) { modal.remove(); modal = null; } }
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharModal(); });
+  function montarModal(titulo, sub, corpo, pe = '') {
+    fecharModal();
+    modal = document.createElement('div'); modal.className = 'modal-fundo';
+    modal.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="${esc(titulo)}"><div class="modal-topo"><h3>${esc(titulo)}</h3><span class="sutil">${sub}</span>` +
+      `<button class="btn-icone" type="button" data-fechar aria-label="Fechar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>` +
+      `<div class="modal-corpo">${corpo}</div>${pe ? `<div class="modal-pe">${pe}</div>` : ''}</div>`;
+    modal.addEventListener('click', (e) => { if (e.target === modal || e.target.closest('[data-fechar]')) fecharModal(); });
+    document.body.appendChild(modal);
+    return modal;
+  }
+  function corDoGrupo(g) {
+    const css = getComputedStyle(document.documentElement);
+    if (g.startsWith('mk:')) return css.getPropertyValue(['--serie-1', '--serie-2', '--serie-3'][+g.split(':')[1]] || '--serie-1').trim();
+    return css.getPropertyValue('--passo-nao').trim();
+  }
+  function nomeDoGrupo(g) {
+    if (g.startsWith('mk:')) return nomesAval()[+g.split(':')[1]] || 'Marketing';
+    return (D.categoriasFora || [])[+g.split(':')[1]] || 'Outras origens';
+  }
+  async function mostrarQuemComprou(filtroG, nomeLinha) {
+    const iv = intervalo();
+    const sub = `${nomeIntervalo(iv)}${estado.origem !== 'todas' ? ' · ' + esc(nomeOrigem(estado.origem)) : ''}`;
+    let senha = null;
+    try { senha = localStorage.getItem(CHAVE_SENHA); } catch (e) {}
+    if (senha) {
+      try { return desenharLista(await abrirVendas(senha), filtroG, nomeLinha, sub); }
+      catch (e) { try { localStorage.removeItem(CHAVE_SENHA); } catch (e2) {} }
+    }
+    const m = montarModal(nomeLinha, sub, `<form class="senha-form"><label for="senha-vendas">Senha da lista de vendas</label><input id="senha-vendas" type="password" autocomplete="current-password" required><span class="senha-erro"></span><button type="submit">Ver lista</button></form>`);
+    const f = m.querySelector('form'); f.querySelector('input').focus();
+    f.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const v = f.querySelector('input').value, erro = f.querySelector('.senha-erro');
+      erro.textContent = 'Abrindo…';
+      try { const lista = await abrirVendas(v); try { localStorage.setItem(CHAVE_SENHA, v); } catch (e2) {} desenharLista(lista, filtroG, nomeLinha, sub); }
+      catch (err) { erro.textContent = err.message === 'arquivo' ? 'A lista só abre no painel publicado.' : 'Senha incorreta.'; }
+    });
+  }
+  function desenharLista(lista, filtroG, nomeLinha, sub) {
+    const [a, b] = intervalo();
+    const oi = estado.origem === 'todas' ? null : D.origens.findIndex((o) => o.id === estado.origem);
+    const casa = (g) => !filtroG || g === filtroG || g.startsWith(filtroG + ':');
+    const itens = lista.filter((x) => { const d = x.h.slice(0, 10); return d >= a && d <= b && (oi == null || x.o === oi) && casa(x.g); })
+      .sort((x, y) => (x.h < y.h ? 1 : -1));
+    const total = itens.reduce((t, x) => t + x.valor, 0);
+    const pacientes = new Set(itens.map((x) => x.paciente.toLowerCase())).size;
+    const corpo = itens.length
+      ? `<table class="tabela"><thead><tr><th>Aprovado em</th><th>Paciente</th><th>Valor</th><th>Procedimentos</th><th>Profissional</th><th>Etiqueta no Kommo</th></tr></thead><tbody>` +
+        itens.map((x) => `<tr><td class="num">${ddmm(x.h)} ${x.h.slice(11, 16)}</td>` +
+          `<td><span class="venda-ponto" style="background:${corDoGrupo(x.g)}" title="${esc(nomeDoGrupo(x.g))}"></span>${esc(x.paciente || '—')}` +
+          `${x.g.endsWith(':longo') ? '<span class="venda-selo">avaliação há +120 dias</span>' : ''}${!filtroG || !filtroG.includes(':') ? `<div class="sutil" style="font-size:11.5px;margin-left:16px">${esc(nomeDoGrupo(x.g))}</div>` : ''}</td>` +
+          `<td class="num">${reais(x.valor)}</td><td>${esc(x.procedimentos || '—')}</td><td>${esc(x.profissional || '—')}</td><td>${esc(x.etiqueta || '—')}</td></tr>`).join('') +
+        '</tbody></table>'
+      : '<p class="sutil" style="margin:14px 0;font-size:13px">Nenhuma venda nesse grupo no período.</p>';
+    const m = montarModal(nomeLinha, sub, corpo, `<span>${plural(itens.length, 'orçamento', 'orçamentos')} · ${plural(pacientes, 'paciente', 'pacientes')} · ${reais(total)}</span><button type="button" data-esquecer>Esquecer a senha neste navegador</button>`);
+    m.querySelector('[data-esquecer]').addEventListener('click', () => { try { localStorage.removeItem(CHAVE_SENHA); } catch (e) {} vendas = null; fecharModal(); });
+  }
+  $('rastreio').addEventListener('click', (e) => {
+    const tr = e.target.closest('tr.clicavel'); if (!tr) return;
+    mostrarQuemComprou(tr.dataset.g, tr.dataset.nome);
+  });
 
   // ------------------------------------------------------------ aba Leads: região pelo DDD
   const REGIOES = [
