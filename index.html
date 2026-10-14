@@ -289,6 +289,17 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .leads-mes td:first-child { min-width: 90px; }
 @media (max-width: 720px) { .dash-abas { order: 3; width: 100%; margin-left: -10px; } }
 
+/* ---------------------------------------------------------------- aba CRM */
+.crm td.num, .crm th.num { text-align: right; }
+.crm td:first-child { white-space: normal; }
+.crm .var-mais { color: var(--ok, #2c9a5b); }
+.crm .var-menos { color: var(--erro, #c43d3d); }
+.crm tr.fechada td { color: var(--texto-3); }
+.crm .faisca { display: block; overflow: visible; }
+.crm .faisca polyline { fill: none; stroke: var(--serie-1); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.crm .faisca circle { fill: var(--serie-1); }
+.crm tfoot td { font-weight: 600; }
+
 /* ---------------------------------------------------------------- rastreio das vendas */
 .rastreio td.grupo { padding-top: 14px; font-size: 12px; font-weight: 600; color: var(--texto-3); border-bottom: 1px solid var(--borda); cursor: default; }
 .rastreio tbody tr.grupo-linha { cursor: default; }
@@ -324,6 +335,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
       <div class="dash-abas" role="tablist" aria-label="Tela">
         <button class="dash-aba" type="button" role="tab" data-aba="funil">Funil</button>
         <button class="dash-aba" type="button" role="tab" data-aba="leads">Leads</button>
+        <button class="dash-aba" type="button" role="tab" data-aba="crm">CRM</button>
       </div>
       <span class="espaco"></span>
       <span class="dash-atualizado" id="atualizado"></span>
@@ -358,6 +370,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
     <div class="dash-secao-topo"><h2 class="com-dica">Rastreio das vendas<span data-dica="rastreio"></span></h2><span class="dash-estado" id="rastreio-total"></span></div>
     <div class="tabela-rolagem" id="rastreio"></div>
   </section>
+  </div>
+
+  <div id="aba-crm" hidden>
+    <section class="dash-secao">
+      <div class="dash-secao-topo">
+        <h2 class="com-dica">Evolução do funil no Kommo<span data-dica="crm"></span></h2>
+        <div class="segmento" id="crm-funil" role="tablist" aria-label="Funil do Kommo"></div>
+      </div>
+      <div class="tabela-rolagem" id="crm-tabela"></div>
+    </section>
   </div>
 
   <div id="aba-leads" hidden>
@@ -413,7 +435,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
   // ------------------------------------------------------------ estado: abre sempre em Hoje e todas as origens
   // avals: tipos de avaliação marcados no filtro (índices de D.avaliacoes); começa com todos
-  const estado = { preset: 'hoje', de: hoje(), ate: hoje(), origem: 'todas', avals: [0, 1, 2] };
+  const estado = { preset: 'hoje', de: hoje(), ate: hoje(), origem: 'todas', avals: [0, 1, 2], funilCrm: 14600179 };
   const nomeOrigem = (id) => id === 'todas' ? 'Todas as origens' : D.origens.find((o) => o.id === id).nome;
 
   function intervalo() {
@@ -490,6 +512,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
       'Marketing: o paciente fez Avaliação Meta, Google ou Urgência Google antes de comprar, em qualquer tempo (é a base do CAC). As vendas com avaliação há mais de 120 dias aparecem na nota da linha e ficam fora da taxa de aprovação.',
       'Outras origens: paciente novo cuja 1ª consulta foi marcada como procedimento, base de pacientes (retorno), avaliação de outra origem, reavaliação ou sem histórico.',
       'Conta pacientes por dia. Este quadro não muda com o filtro de avaliação.'],
+    crm: ['Cards em cada etapa dos funis Leads e Oportunidades do Kommo, no fim de cada dia. O histórico começa em 10/10, quando os funis foram criados.',
+      'Agora = fim do período; início = fim do dia anterior ao período. Entraram = cards que chegaram na etapa no período (por mudança de etapa ou lead criado já nela). A linha mostra o estoque dia a dia.',
+      'Convertido, Desqualificado, Fechado ganho e Fechado perdido são etapas fechadas e não entram no total de abertos.'],
     leadsTempo: ['Leads criados no Kommo, pela hora em que chegaram, separados pelo DDD do telefone. Florianópolis = DDD 48; interior de SC = 47 e 49; outros estados = qualquer outro DDD do Brasil.',
       'O DDD 48 também cobre o sul do estado (Criciúma, Tubarão, Laguna), que fica junto com Florianópolis.'],
     leadsMes: ['Todos os meses desde o início do Kommo, com o filtro de origem aplicado. Não muda com o período.'],
@@ -904,10 +929,52 @@ button { font: inherit; color: inherit; cursor: pointer; }
       : '<p class="sutil" style="margin:0;font-size:13px">Nenhum lead de outro estado no período.</p>';
   }
 
+  // ------------------------------------------------------------ aba CRM: evolução das etapas do Kommo
+  function desenharCrm(iv) {
+    const C = D.crm; const caixa = $('crm-tabela');
+    if (!C || !C.funis?.length) { caixa.innerHTML = '<p class="sutil" style="margin:0;font-size:13px">Sem dados do Kommo ainda.</p>'; return; }
+    if (!C.funis.some((f) => f.id === estado.funilCrm)) estado.funilCrm = C.funis[0].id;
+    $('crm-funil').innerHTML = C.funis.map((f) => `<button type="button" role="tab" data-f="${f.id}" class="${f.id === estado.funilCrm ? 'on' : ''}" aria-selected="${f.id === estado.funilCrm}">${esc(f.nome)}</button>`).join('');
+    const f = C.funis.find((x) => x.id === estado.funilCrm);
+    const dias = Object.keys(C.estoque).sort();
+    const [a, b] = iv;
+    const fimDia = dias.filter((d) => d <= b).pop() || dias[0];
+    const antes = somaDias(a, -1);
+    // período que começa antes do histórico parte do fim de 10/10 (funis já montados); a carga em massa daquele dia não conta como entrada
+    const iniDia = dias.filter((d) => d <= antes).pop() || dias[0];
+    const entDesde = a > iniDia ? a : somaDias(iniDia, 1);
+    // a linha cobre o período, com pelo menos 7 dias para dar forma
+    let serie = dias.filter((d) => d >= (iniDia || dias[0]) && d <= fimDia);
+    if (serie.length < 7) serie = dias.filter((d) => d <= fimDia).slice(-7);
+    const ent = {};
+    for (const [h, ch, q] of C.entradas) { const d = h.slice(0, 10); if (d >= entDesde && d <= b) ent[ch] = (ent[ch] || 0) + q; }
+    const fechada = (ch) => /:(142|143)$/.test(ch);
+    const faisca = (ch) => {
+      const v = serie.map((d) => C.estoque[d][ch] || 0), mx = Math.max(1, ...v), mn = Math.min(...v), W = 120, H = 26;
+      const pts = v.map((x, i) => [v.length > 1 ? (i * W) / (v.length - 1) : W, H - 2 - ((x - mn) / (mx - mn || 1)) * (H - 4)]);
+      const tip = `<div class="dash-tip-titulo">${esc(f.etapas.find((e) => e.chave === ch).nome)}</div>` + serie.map((d, i) => `<div>${ddmm(d)}: <b>${n(v[i])}</b></div>`).join('');
+      return `<svg class="faisca" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" data-tip="${esc(tip)}"><polyline points="${pts.map((p) => p.join(',')).join(' ')}"/><circle cx="${pts.at(-1)[0]}" cy="${pts.at(-1)[1]}" r="2.5"/></svg>`;
+    };
+    const varTxt = (x) => x > 0 ? `<span class="var-mais">+${n(x)}</span>` : x < 0 ? `<span class="var-menos">−${n(-x)}</span>` : '<span class="sutil">0</span>';
+    let tAg = 0, tIni = 0, tEnt = 0;
+    const linhas = f.etapas.map((e) => {
+      const ag = C.estoque[fimDia]?.[e.chave] || 0, ini = iniDia ? C.estoque[iniDia]?.[e.chave] || 0 : null, en = ent[e.chave] || 0;
+      if (!fechada(e.chave)) { tAg += ag; tIni += ini || 0; tEnt += en; }
+      return `<tr class="${fechada(e.chave) ? 'fechada' : ''}"><td>${esc(e.nome)}</td><td class="num">${n(ag)}</td><td class="num">${ini == null ? '—' : n(ini)}</td>` +
+        `<td class="num">${ini == null ? '—' : varTxt(ag - ini)}</td><td class="num">${n(en)}</td><td>${faisca(e.chave)}</td></tr>`;
+    }).join('');
+    const rotFim = fimDia === hoje() ? 'Agora' : `Em ${ddmm(fimDia)}`;
+    const rotIni = iniDia === dias[0] && antes < dias[0] ? `Em ${ddmm(iniDia)} (criação)` : `Em ${ddmm(iniDia)}`;
+    caixa.innerHTML = `<table class="tabela crm"><thead><tr><th>Etapa</th><th class="num">${rotFim}</th><th class="num">${rotIni}</th><th class="num">Variação</th><th class="num">Entraram no período</th><th>Dia a dia</th></tr></thead><tbody>${linhas}</tbody>` +
+      `<tfoot><tr><td>Abertos</td><td class="num">${n(tAg)}</td><td class="num">${iniDia ? n(tIni) : '—'}</td><td class="num">${iniDia ? varTxt(tAg - tIni) : '—'}</td><td class="num">${n(tEnt)}</td><td></td></tr></tfoot></table>` +
+      (antes < dias[0] ? `<p class="sutil" style="margin:8px 0 0;font-size:12px">Os funis foram criados em ${ddmm(C.inicio)}: o período começa no fim desse dia.</p>` : '');
+  }
+  $('crm-funil').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; estado.funilCrm = +b.dataset.f; desenhar(); });
+
   // ------------------------------------------------------------ abas
-  const abaAtual = () => (location.hash === '#leads' ? 'leads' : 'funil');
+  const abaAtual = () => (location.hash === '#leads' ? 'leads' : location.hash === '#crm' ? 'crm' : 'funil');
   document.querySelectorAll('.dash-aba').forEach((b) => b.addEventListener('click', () => {
-    history.replaceState(null, '', b.dataset.aba === 'leads' ? '#leads' : location.pathname + location.search);
+    history.replaceState(null, '', b.dataset.aba === 'funil' ? location.pathname + location.search : '#' + b.dataset.aba);
     desenhar();
   }));
   addEventListener('hashchange', () => desenhar());
@@ -1021,12 +1088,14 @@ button { font: inherit; color: inherit; cursor: pointer; }
   function desenhar() {
     const iv = intervalo(), aba = abaAtual();
     document.querySelectorAll('.dash-aba').forEach((b) => { b.classList.toggle('on', b.dataset.aba === aba); b.setAttribute('aria-selected', b.dataset.aba === aba); });
-    $('aba-funil').hidden = aba !== 'funil'; $('aba-leads').hidden = aba !== 'leads';
-    $('avaliacao').hidden = aba !== 'funil'; // o tipo de avaliação não se aplica à aba Leads
+    $('aba-funil').hidden = aba !== 'funil'; $('aba-leads').hidden = aba !== 'leads'; $('aba-crm').hidden = aba !== 'crm';
+    $('avaliacao').hidden = aba !== 'funil'; // o tipo de avaliação só vale no Funil
+    $('origem').hidden = aba === 'crm'; // a evolução do Kommo não é separada por etiqueta
     desenharPeriodo(); desenharOrigem(); desenharAvaliacao(); desenharAtualizado();
     if (aba === 'leads') desenharLeads(iv);
+    else if (aba === 'crm') desenharCrm(iv);
     else { const r = resumo(linhasDe(iv, estado.origem)); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharRastreio(iv); }
-    document.title = `${aba === 'leads' ? 'Leads' : 'Funil'} · ${nomeIntervalo(iv)} · NossoLarMed`;
+    document.title = `${{ leads: 'Leads', crm: 'CRM', funil: 'Funil' }[aba]} · ${nomeIntervalo(iv)} · NossoLarMed`;
   }
   if (!D || !D.linhas) D = { linhas: [], origens: D?.origens || [], aguardandoAceite: [], maturacaoDias: 21, extraidoEm: new Date(0).toISOString(), primeiroDia: null };
   desenhar();
