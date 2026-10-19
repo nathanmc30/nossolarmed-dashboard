@@ -292,22 +292,24 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
 .resumo .mais { color: var(--ok); } .resumo .menos { color: var(--erro); }
 .fluxo {
   display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.2fr);
-  align-items: start; gap: 0 18px; padding: 22px 24px 20px; background: var(--painel); border: 1px solid var(--borda); border-radius: 12px;
+  align-items: start; gap: 0 12px; padding: 22px 24px 20px; background: var(--painel); border: 1px solid var(--borda); border-radius: 12px;
 }
 .fluxo-etapa { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .fluxo-cmp { grid-column: 1 / -1; font-size: 12px; color: var(--texto-4); margin: -8px 0 10px; }
 .fluxo-etapa .rot { font-size: 12.5px; font-weight: 500; color: var(--texto-3); }
 .fluxo-etapa > b { font-size: 32px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; color: var(--texto-forte); font-variant-numeric: tabular-nums; }
 .fluxo-etapa.venda > b { color: var(--marca); }
-.fluxo-etapa .sub { font-size: 12.5px; color: var(--texto-3); font-variant-numeric: tabular-nums; }
+.fluxo-etapa .sub { font-size: 12.5px; color: var(--texto-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fluxo-etapa .sub em { font-style: normal; color: var(--texto-2); }
 .delta { font-size: 12px; font-variant-numeric: tabular-nums; color: var(--texto-3); }
 .delta.mais { color: var(--ok); } .delta.menos { color: var(--erro); }
-.fluxo-passo { align-self: center; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 96px; padding-top: 6px; }
-.fluxo-passo .seta { width: 100%; height: 10px; color: var(--borda-hover); }
-.fluxo-passo b { font-size: 17px; font-weight: 600; color: var(--marca); font-variant-numeric: tabular-nums; }
-.fluxo-passo .base { font-size: 11.5px; color: var(--texto-3); white-space: nowrap; }
-.fluxo-passo .com-dica { gap: 2px; }
+.fluxo-passo { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 136px; }
+.fluxo-passo .rot { font-size: 12.5px; font-weight: 500; color: var(--texto-3); white-space: nowrap; line-height: 1.45; gap: 2px; }
+/* a linha do valor tem a altura do número grande da etapa (32px × 1,15), então seta e números ficam na mesma altura */
+.fluxo-passo .valor { height: 37px; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.fluxo-passo .valor b { font-size: 18px; font-weight: 600; line-height: 1.1; color: var(--marca); font-variant-numeric: tabular-nums; }
+.fluxo-passo .seta { width: 100%; height: 8px; color: var(--borda-hover); }
+.fluxo-passo .sub { font-size: 12.5px; line-height: 1.45; }
 .fluxo-etapa .taxa { display: none; font-size: 12.5px; color: var(--marca); font-weight: 600; }
 .dinheiro { display: flex; flex-direction: column; }
 .dinheiro .linha { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--borda-fraca); }
@@ -318,7 +320,8 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
 .dinheiro .linha.forte b { font-size: 22px; color: var(--marca); }
 @media (max-width: 900px) {
   .fluxo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 16px; }
-  .fluxo-passo { display: none; }
+  .fluxo-passo { display: none !important; }
+  .fluxo-etapa .sub { white-space: normal; }
   .fluxo-etapa .taxa { display: block; }
 }
 
@@ -842,18 +845,20 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
 
     // o fluxo: quatro números e a passagem entre eles
     const etapa = (rot, v, v0, sub, extra = '') => `<div class="fluxo-etapa${extra}"><span class="rot">${rot}</span><b>${v}</b><span class="sub">${sub}</span></div>`;
-    const passo = (a, b, a0, b0, base, dica) => `<div class="fluxo-passo"><svg class="seta" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path d="M0 5H96M91 1l5 4-5 4" fill="none" stroke="currentColor" stroke-width="1.2" vector-effect="non-scaling-stroke"/></svg>` +
-      `<b>${pct(a, b, 0)}</b><span class="base com-dica">${base}<span data-dica-local="${dica}"></span></span>${deltaPp(a, b, a0, b0)}</div>`;
+    // a passagem tem as mesmas três linhas da etapa: nome da taxa, valor (com a seta) e variação
+    const passo = (a, b, a0, b0, nome, dica) => `<div class="fluxo-passo"><span class="rot com-dica">${nome}<span data-dica-local="${dica}"></span></span>` +
+      `<span class="valor"><b>${pct(a, b, 0)}</b><svg class="seta" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true"><path d="M0 5H96M91 1l5 4-5 4" fill="none" stroke="currentColor" stroke-width="1.2" vector-effect="non-scaling-stroke"/></svg></span>` +
+      `<span class="sub">${deltaPp(a, b, a0, b0)}</span></div>`;
     const taxa = (a, b, base) => `<span class="taxa">${pct(a, b, 0)} ${base}</span>`;
     $('fluxo').innerHTML =
       (cmp ? `<div class="fluxo-cmp">Variações contra ${esc(vsNome)}</div>` : '') +
       etapa('Leads', n(r.leads), r0?.leads, `${deltaQtd(r.leads, r0?.leads)}`) +
-      passo(e.marcada.q, r.leads, e0?.marcada.q, r0?.leads, 'dos leads', 'agendaram') +
-      etapa('Avaliações marcadas', n(e.marcada.q), e0?.marcada.q, `${deltaQtd(e.marcada.q, e0?.marcada.q)} ${taxa(e.marcada.q, r.leads, 'dos leads')}`) +
-      passo(e.compareceu.q, e.prevista.q, e0?.compareceu.q, e0?.prevista.q, 'das previstas', 'comparecimento') +
-      etapa('Compareceram', n(e.compareceu.q), e0?.compareceu.q, `de ${n(e.prevista.q)} previstas · ${deltaQtd(e.compareceu.q, e0?.compareceu.q)} ${taxa(e.compareceu.q, e.prevista.q, 'das previstas')}`) +
-      passo(e.aprovado.q, e.compareceu.q, e0?.aprovado.q, e0?.compareceu.q, 'das comparecidas', 'aprovacao') +
-      etapa('Vendas', n(e.aprovado.q), e0?.aprovado.q, `<em>${reais(e.aprovado.v)}</em> · ${deltaQtd(e.aprovado.q, e0?.aprovado.q)} ${taxa(e.aprovado.q, e.compareceu.q, 'das comparecidas')}`, ' venda');
+      passo(e.marcada.q, r.leads, e0?.marcada.q, r0?.leads, 'Taxa de agendamento', 'agendaram') +
+      etapa('Avaliações marcadas', n(e.marcada.q), e0?.marcada.q, `${deltaQtd(e.marcada.q, e0?.marcada.q)} ${taxa(e.marcada.q, r.leads, 'de agendamento')}`) +
+      passo(e.compareceu.q, e.prevista.q, e0?.compareceu.q, e0?.prevista.q, 'Taxa de comparecimento', 'comparecimento') +
+      etapa('Compareceram', n(e.compareceu.q), e0?.compareceu.q, `${deltaQtd(e.compareceu.q, e0?.compareceu.q)} · de ${n(e.prevista.q)} previstas ${taxa(e.compareceu.q, e.prevista.q, 'de comparecimento')}`) +
+      passo(e.aprovado.q, e.compareceu.q, e0?.aprovado.q, e0?.compareceu.q, 'Taxa de conversão', 'aprovacao') +
+      etapa('Vendas', n(e.aprovado.q), e0?.aprovado.q, `${deltaQtd(e.aprovado.q, e0?.aprovado.q)} · <em>${reais(e.aprovado.v)}</em> ${taxa(e.aprovado.q, e.compareceu.q, 'de conversão')}`, ' venda');
     ligarDicas($('fluxo'));
 
     // o dinheiro do período
