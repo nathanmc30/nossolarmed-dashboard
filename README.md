@@ -1,4 +1,4 @@
-# Funil comercial · NossoLarMed
+# Painel comercial · Elora
 
 Dashboard do funil do lead à venda: leads do Kommo cruzados pelo telefone com a agenda e os orçamentos do Clinicorp.
 

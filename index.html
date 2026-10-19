@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#efebe5">
 <meta name="color-scheme" content="light">
-<title>Comercial · NossoLarMed</title>
+<title>Comercial · Elora</title>
 <link rel="preload" href="fontes/inter-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <script>
   // Mesmo esquema do Aspekto Business: claro é o padrão, só quem salvou 'escuro' vê o escuro.
@@ -346,7 +346,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   <div class="dash-topo">
     <header class="dash-nav">
       <h1>Comercial</h1>
-      <span class="dash-cliente" translate="no">NossoLarMed</span>
+      <span class="dash-cliente" translate="no">Elora</span>
       <nav class="dash-abas" aria-label="Telas">
         <a class="dash-aba" href="#" data-aba="funil">Funil</a>
         <a class="dash-aba" href="#leads" data-aba="leads">Leads</a>
@@ -1158,7 +1158,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
     if (aba === 'leads') desenharLeads(iv);
     else if (aba === 'crm') desenharCrm(iv);
     else { const r = resumo(linhasDe(iv, estado.origem)); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharRastreio(iv); }
-    document.title = `${{ leads: 'Leads', crm: 'CRM', funil: 'Funil' }[aba]} · ${nomeIntervalo(iv)} · NossoLarMed`;
+    document.title = `${{ leads: 'Leads', crm: 'CRM', funil: 'Funil' }[aba]} · ${nomeIntervalo(iv)} · Elora`;
   }
   if (!D || !D.linhas) D = { linhas: [], origens: D?.origens || [], aguardandoAceite: [], maturacaoDias: 21, extraidoEm: new Date(0).toISOString(), primeiroDia: null };
   lerUrl();
