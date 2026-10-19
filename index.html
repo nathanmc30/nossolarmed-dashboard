@@ -598,7 +598,8 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
     ticket: ['Tudo o que foi vendido no período (marketing e outras origens) ÷ número de vendas. A variação é contra o período anterior equivalente.'],
     mesAMesFunil: ['Cada linha é um mês, acumulado dia a dia: o mês atual vai até hoje e se compara com o mês passado no mesmo dia.',
       'Faturamento = tudo o que foi aprovado (marketing e outras origens), o mesmo "Total vendido" do quadro de vendas. Ticket médio = faturamento ÷ vendas até o dia. Comparecimento = comparecidas ÷ previstas até o dia; conversão = vendas ÷ comparecidas até o dia.',
-      'Segue os filtros de origem e de avaliação (o faturamento ignora o de avaliação); não muda com o período.'],
+      'Leads = leads criados no Kommo, o mesmo gráfico da aba Leads.',
+      'Segue os filtros de origem e de avaliação (leads, faturamento e ticket ignoram o de avaliação); não muda com o período.'],
     mesAMes: ['Leads criados no Kommo, somados dia a dia dentro de cada mês. Cada linha é um mês; o mês atual vai até hoje.',
       'A comparação usa o mesmo dia do mês: este mês até hoje contra o mês passado até o mesmo dia.',
       'Segue o filtro de origem; não muda com o período.'],
@@ -1154,8 +1155,11 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
       const pts = acum[m].map((v, i) => (v == null ? null : `${x(i + 1).toFixed(1)},${y(v).toFixed(1)}`)).filter(Boolean);
       if (pts.length) g += `<polyline class="mm-linha${m !== mesAtual && m !== anterior ? ' fraca' : ''}" stroke="${corDe(m)}" points="${pts.join(' ')}"/>`;
     }
-    if (atual != null) g += `<circle class="mm-ponto" r="4" fill="${corDe(mesAtual)}" cx="${x(diaHoje)}" cy="${y(atual)}"/><text class="mm-rotulo" fill="${corDe(mesAtual)}" x="${x(diaHoje) - 8}" y="${y(atual) - 9}" text-anchor="end">${cfg.fmt(atual)}</text>`;
-    if (anterior && passado != null) g += `<circle class="mm-ponto" r="3.5" fill="${corDe(anterior)}" cx="${x(diaHoje)}" cy="${y(passado)}"/><text class="mm-rotulo" fill="${corDe(anterior)}" x="${x(diaHoje) + 8}" y="${y(passado) + 14}">${cfg.fmt(passado)}</text>`;
+    // rótulos dos dois pontos de hoje: o mais alto vai acima do ponto, o mais baixo abaixo, para nunca cruzarem
+    const atualEmCima = passado == null || atual == null || atual >= passado;
+    const yRot = (v, emCima) => Math.min(H - mB - 4, Math.max(mT + 10, emCima ? y(v) - 9 : y(v) + 16));
+    if (atual != null) g += `<circle class="mm-ponto" r="4" fill="${corDe(mesAtual)}" cx="${x(diaHoje)}" cy="${y(atual)}"/><text class="mm-rotulo" fill="${corDe(mesAtual)}" x="${x(diaHoje) - 8}" y="${yRot(atual, atualEmCima)}" text-anchor="end">${cfg.fmt(atual)}</text>`;
+    if (anterior && passado != null) g += `<circle class="mm-ponto" r="3.5" fill="${corDe(anterior)}" cx="${x(diaHoje)}" cy="${y(passado)}"/><text class="mm-rotulo" fill="${corDe(anterior)}" x="${x(diaHoje) + 8}" y="${yRot(passado, !atualEmCima)}">${cfg.fmt(passado)}</text>`;
     g += `<line class="mm-mira" x1="0" x2="0" y1="${mT}" y2="${H - mB}" visibility="hidden"/><rect class="mm-alvo" data-tip-proprio x="${mE}" y="${mT}" width="${W - mE - mD}" height="${H - mT - mB}" fill="transparent"/>`;
     caixa.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="${esc(cfg.nome)} acumulado por dia do mês: ${nomeMes(mesAtual)} ${atual == null ? '—' : cfg.fmt(atual)} até o dia ${diaHoje}${anterior && passado != null ? `, ${nomeMes(anterior)} ${cfg.fmt(passado)} no mesmo dia` : ''}">${g}</svg>`;
 
@@ -1174,13 +1178,12 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   }
 
   // leads (aba Leads)
-  function desenharMesAMes() {
-    graficoMeses({ pre: 'mm', nome: 'Leads', taxa: false, fmt: (v) => n(Math.round(v)), fmtCurto: (v) => n(v),
-      diario: (m) => { const num = Array(32).fill(0); for (const [h, , , q] of linhasLeads([m + '-01', m + '-31'])) num[+h.slice(8, 10)] += q; return { num }; } });
-  }
+  const CFG_LEADS = { nome: 'Leads', taxa: false, fmt: (v) => n(Math.round(v)), fmtCurto: (v) => n(v),
+    diario: (m) => { const num = Array(32).fill(0); for (const [h, , , q] of linhasLeads([m + '-01', m + '-31'])) num[+h.slice(8, 10)] += q; return { num }; } };
+  function desenharMesAMes() { graficoMeses({ pre: 'mm', ...CFG_LEADS }); }
 
   // faturamento, comparecimento e conversão (aba Funil), pelos eventos com o filtro de origem (e de avaliação nas taxas)
-  const METRICAS_MES = [['faturamento', 'Faturamento'], ['ticket', 'Ticket médio'], ['comparecimento', 'Comparecimento'], ['conversao', 'Conversão']];
+  const METRICAS_MES = [['leads', 'Leads'], ['faturamento', 'Faturamento'], ['ticket', 'Ticket médio'], ['comparecimento', 'Comparecimento'], ['conversao', 'Conversão']];
   function diarioEventos(m, tipos, usaAval) {
     const oi = estado.origem === 'todas' ? null : D.origens.findIndex((o) => o.id === estado.origem);
     const porTipo = Object.fromEntries(tipos.map((t) => [t, { q: Array(32).fill(0), v: Array(32).fill(0) }]));
@@ -1196,6 +1199,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
     $('mf-metrica').innerHTML = METRICAS_MES.map(([k, rot]) => `<button type="button" data-m="${k}" class="${k === met ? 'on' : ''}" aria-pressed="${k === met}">${rot}</button>`).join('');
     const pctFmt = (v) => `${Math.round(v)}%`;
     const cfgs = {
+      leads: CFG_LEADS,
       // faturamento = tudo o que foi aprovado (marketing e outras origens), como o "Total vendido" do rastreio
       faturamento: { nome: 'Faturamento', taxa: false, fmt: reaisCurto, fmtCurto: (v) => (v >= 1000 ? `${n(v / 1000)} mil` : n(v)),
         diario: (m) => { const t = diarioEventos(m, ['aprovado', 'aprovado_longo', 'casa'], false); return { num: t.aprovado.v.map((x, i) => x + t.aprovado_longo.v[i] + t.casa.v[i]) }; } },
