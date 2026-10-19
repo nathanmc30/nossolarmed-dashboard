@@ -489,7 +489,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   const somaDias = (iso, k) => new Date(Date.parse(iso + 'T12:00:00Z') + k * DIA).toISOString().slice(0, 10);
   const diasEntre = (a, b) => Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / DIA);
   const PRESETS = [
-    ['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7d', '7 dias'], ['30d', '30 dias'], ['mes', 'Este mês'], ['tudo', 'Tudo'], ['custom', 'Personalizado'],
+    ['hoje', 'Hoje'], ['ontem', 'Ontem'], ['7d', '7 dias'], ['30d', '30 dias'], ['mes', 'Este mês'], ['mespassado', 'Mês passado'], ['tudo', 'Tudo'], ['custom', 'Personalizado'],
   ];
 
   // ------------------------------------------------------------ estado: abre sempre em Hoje e todas as origens
@@ -497,6 +497,9 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   const estado = { preset: 'hoje', de: hoje(), ate: hoje(), origem: 'todas', avals: [0, 1, 2], funilCrm: 14600179 };
   const nomeOrigem = (id) => id === 'todas' ? 'Todas as origens' : D.origens.find((o) => o.id === id).nome;
 
+  const mesAntes = (m, k) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 1 - k, 1)).toISOString().slice(0, 7);
+  const ultimoDia = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate();
+  const pad2 = (x) => String(x).padStart(2, '0');
   function intervalo() {
     const h = hoje();
     switch (estado.preset) {
@@ -505,6 +508,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
       case '7d': return [somaDias(h, -6), h];
       case '30d': return [somaDias(h, -29), h];
       case 'mes': return [h.slice(0, 8) + '01', h];
+      case 'mespassado': { const m = mesAntes(h.slice(0, 7), 1); return [m + '-01', `${m}-${pad2(ultimoDia(m))}`]; }
       case 'tudo': return [D.primeiroDia || h, h];
       default: return [estado.de, estado.ate];
     }
@@ -787,12 +791,15 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   }
   const plural = (q, um, varios) => `${n(q)} ${q === 1 ? um : varios}`;
   const NOMES_MES_CURTO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-  const pad2 = (x) => String(x).padStart(2, '0');
 
   // Contra o quê cada número se compara: o mesmo pedaço do período anterior, cortado no mesmo horário quando o período vai até agora.
   function comparacao() {
     const [a, b] = intervalo(), h = hoje(), hora = pad2(+isoBRT(Date.now()).slice(11, 13));
     if (estado.preset === 'tudo') return null;
+    if (estado.preset === 'mespassado') {
+      const m = mesAntes(h.slice(0, 7), 2);
+      return { faixa: [`${m}-01T00`, `${m}-${pad2(ultimoDia(m))}T23`], nome: `${NOMES_MES_CURTO[+m.slice(5, 7) - 1]} inteiro` };
+    }
     if (estado.preset === 'mes') {
       const d = new Date(Date.UTC(+h.slice(0, 4), +h.slice(5, 7) - 2, 1)).toISOString().slice(0, 7);
       const ult = Math.min(+h.slice(8, 10), new Date(Date.UTC(+d.slice(0, 4), +d.slice(5, 7), 0)).getUTCDate());
@@ -827,7 +834,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
     const aceite = estado.origem === 'todas' ? aguardandoNo(iv).length : 0;
     const varLeads = r0 && r0.leads ? (r.leads - r0.leads) / r0.leads : null;
     const mesNome = NOMES_MES_CURTO[+hoje().slice(5, 7) - 1];
-    const rotPeriodo = { hoje: 'Hoje', ontem: 'Ontem', '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', mes: `${mesNome[0].toUpperCase() + mesNome.slice(1)} até hoje`, tudo: 'Desde o início' }[estado.preset] || `De ${nomeIntervalo(iv)}`;
+    const rotPeriodo = { hoje: 'Hoje', ontem: 'Ontem', '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias', mes: `${mesNome[0].toUpperCase() + mesNome.slice(1)} até hoje`, mespassado: (() => { const m = NOMES_MES_CURTO[+mesAntes(hoje().slice(0, 7), 1).slice(5, 7) - 1]; return `${m[0].toUpperCase() + m.slice(1)} inteiro`; })(), tudo: 'Desde o início' }[estado.preset] || `De ${nomeIntervalo(iv)}`;
     $('resumo').innerHTML = `${esc(rotPeriodo)}: <b>${leadsN(r.leads)}</b>` +
       (varLeads != null ? ` <span class="${varLeads >= 0 ? 'mais' : 'menos'}">(${varLeads >= 0 ? '+' : '−'}${Math.abs(Math.round(varLeads * 100))}% vs ${esc(vsNome)})</span>` : '') +
       `, <b>${plural(e.marcada.q, 'avaliação marcada', 'avaliações marcadas')}</b> e <b>${plural(e.aprovado.q, 'venda', 'vendas')}</b> de marketing, somando <b>${reaisCurto(e.aprovado.v)}</b>.` +
