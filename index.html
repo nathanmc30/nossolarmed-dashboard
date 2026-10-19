@@ -310,6 +310,9 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
 .crm .faisca polyline { fill: none; stroke: var(--serie-1); stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
 .crm .faisca circle { fill: var(--serie-1); }
 .crm tfoot td { font-weight: 600; }
+.crm td.passagem { text-align: left; white-space: nowrap; font-size: 12.5px; }
+.crm td.passagem b { font-weight: 600; color: var(--texto); }
+.crm th:nth-child(6) { text-align: left; }
 
 /* ---------------------------------------------------------------- rastreio das vendas */
 .rastreio tr.grupo-linha td { padding-top: 16px; font-weight: 600; color: var(--texto); border-bottom: 1px solid var(--borda); }
@@ -528,6 +531,9 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
       'Marketing: o paciente fez Avaliação Meta, Google ou Urgência Google antes de comprar, em qualquer tempo (é a base do CAC). As vendas com avaliação há mais de 120 dias aparecem na nota da linha e ficam fora da taxa de aprovação.',
       'Outras origens: paciente novo cuja 1ª consulta foi marcada como procedimento, base de pacientes (retorno), avaliação de outra origem, reavaliação ou sem histórico.',
       'Conta pacientes por dia. Este quadro não muda com o filtro de avaliação.'],
+    passagem: ['Cards que entraram nesta etapa no período ÷ cards que entraram na etapa de onde ela vem, no mesmo período (pela data de cada mudança, mesmo que não sejam os mesmos cards).',
+      'Caminho: Entrada → Abordagem → Conectado → Convertido e SQL → Avaliação agendada → Compareceu → Em negociação → Aguardando compra → Fechado ganho. Desvios: Esfriou sobre Abordagem, Desqualificado sobre Entrada, No Show sobre Avaliação agendada, Fechado perdido sobre SQL.',
+      'Pula etapa conta na etapa de chegada: um card que vai direto de Entrada para Conectado entra em Conectado sem ter passado por Abordagem.'],
     crm: ['Cards em cada etapa dos funis Leads e Oportunidades do Kommo, no fim de cada dia. O histórico começa em 10/10, quando os funis foram criados.',
       'Agora = fim do período; início = fim do dia anterior ao período. Entraram = cards que chegaram na etapa no período (por mudança de etapa ou lead criado já nela). A linha mostra o estoque dia a dia.',
       'Convertido, Desqualificado, Fechado ganho e Fechado perdido são etapas fechadas e não entram no total de abertos.'],
@@ -967,6 +973,15 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   }
 
   // ------------------------------------------------------------ aba CRM: evolução das etapas do Kommo
+  // De onde cada etapa recebe os cards (para a passagem). Caminho: Entrada → Abordagem → Conectado → Convertido;
+  // SQL → Agendada → Compareceu → Em negociação → Aguardando compra → Fechado ganho. Desvios medem sobre a etapa de onde saem.
+  const BASE_ETAPA = {
+    '14600179:112805211': '14600179:112805207', '14600179:112805215': '14600179:112805211', '14600179:142': '14600179:112805215',
+    '14600179:112805219': '14600179:112805211', '14600179:143': '14600179:112805207',
+    '14600183:112805231': '14600183:112805227', '14600183:112805235': '14600183:112805231', '14600183:112805239': '14600183:112805231',
+    '14600183:112805243': '14600183:112805239', '14600183:112805247': '14600183:112805243', '14600183:142': '14600183:112805243',
+    '14600183:143': '14600183:112805227',
+  };
   function desenharCrm(iv) {
     const C = D.crm; const caixa = $('crm-tabela');
     if (!C || !C.funis?.length) { caixa.innerHTML = '<p class="sutil" style="margin:0;font-size:13px">Sem dados do Kommo ainda.</p>'; return; }
@@ -1000,14 +1015,19 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
     const linhas = f.etapas.map((e) => {
       const ag = C.estoque[fimDia]?.[e.chave] || 0, ini = iniDia ? C.estoque[iniDia]?.[e.chave] || 0 : null, en = ent[e.chave] || 0;
       if (!fechada(e.chave)) { tAg += ag; tIni += ini || 0; tEnt += en; }
+      const base = BASE_ETAPA[e.chave], nomeBase = base && f.etapas.find((x) => x.chave === base)?.nome;
+      const passagem = base ? `<b>${pct(en, ent[base] || 0, 0)}</b> <span class="sutil">de ${esc(nomeBase)}</span>` : '<span class="sutil">—</span>';
       return `<tr class="${fechada(e.chave) ? 'fechada' : ''}"><td>${esc(e.nome)}</td><td class="num">${n(ag)}</td><td class="num">${ini == null ? '—' : n(ini)}</td>` +
-        `<td class="num">${ini == null ? '—' : varTxt(ag - ini)}</td><td class="num">${n(en)}</td><td>${faisca(e.chave)}</td></tr>`;
+        `<td class="num">${ini == null ? '—' : varTxt(ag - ini)}</td><td class="num">${n(en)}</td><td class="passagem">${passagem}</td><td>${faisca(e.chave)}</td></tr>`;
     }).join('');
+    // funil Leads: os chats ainda não aceitos ficam na caixa de aceite do Kommo, antes da Entrada (só existe o retrato de agora)
+    const aceite = f.id === 14600179 ? `<tr class="fechada"><td>Aguardando aceite <span class="sutil">(chats, ainda sem lead)</span></td><td class="num">${fimDia === hoje() ? n((D.aguardandoAceite || []).length) : '—'}</td><td class="num">—</td><td class="num">—</td><td class="num">${n(aguardandoNo([entDesde, b]).length)}</td><td></td><td></td></tr>` : '';
     const rotFim = fimDia === hoje() ? 'Agora' : `Em ${ddmm(fimDia)}`;
     const rotIni = iniDia === dias[0] && antes < dias[0] ? `Em ${ddmm(iniDia)} (criação)` : `Em ${ddmm(iniDia)}`;
-    caixa.innerHTML = `<table class="tabela crm"><thead><tr><th>Etapa</th><th class="num">${rotFim}</th><th class="num">${rotIni}</th><th class="num">Variação</th><th class="num">Entraram no período</th><th>Dia a dia</th></tr></thead><tbody>${linhas}</tbody>` +
-      `<tfoot><tr><td>Abertos</td><td class="num">${n(tAg)}</td><td class="num">${iniDia ? n(tIni) : '—'}</td><td class="num">${iniDia ? varTxt(tAg - tIni) : '—'}</td><td class="num">${n(tEnt)}</td><td></td></tr></tfoot></table>` +
+    caixa.innerHTML = `<table class="tabela crm"><thead><tr><th>Etapa</th><th class="num">${rotFim}</th><th class="num">${rotIni}</th><th class="num">Variação</th><th class="num">Entraram no período</th><th class="com-dica">Passagem<span data-dica-local="passagem"></span></th><th>Dia a dia</th></tr></thead><tbody>${aceite}${linhas}</tbody>` +
+      `<tfoot><tr><td>Abertos</td><td class="num">${n(tAg)}</td><td class="num">${iniDia ? n(tIni) : '—'}</td><td class="num">${iniDia ? varTxt(tAg - tIni) : '—'}</td><td class="num">${n(tEnt)}</td><td></td><td></td></tr></tfoot></table>` +
       (antes < dias[0] ? `<p class="sutil" style="margin:8px 0 0;font-size:12px">Os funis foram criados em ${ddmm(C.inicio)}: o período começa no fim desse dia.</p>` : '');
+    ligarDicas(caixa);
   }
   $('crm-funil').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; estado.funilCrm = +b.dataset.f; desenhar(); });
 
