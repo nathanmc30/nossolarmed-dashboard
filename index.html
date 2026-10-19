@@ -300,6 +300,27 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
 .leads-mes td:first-child { min-width: 90px; }
 @media (max-width: 720px) { .dash-abas { order: 3; width: 100%; margin-left: -10px; } }
 
+/* ---------------------------------------------------------------- leads mês a mês (acumulado por dia do mês) */
+.mm-compara { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 28px; }
+.mm-compara > div { display: flex; flex-direction: column; gap: 2px; }
+.mm-compara b { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; color: var(--texto-forte); font-variant-numeric: tabular-nums; }
+.mm-compara .rot { font-size: 12px; font-weight: 500; color: var(--texto-3); }
+.mm-delta { font-size: 13px; font-weight: 600; }
+.mm-delta.mais { color: var(--ok, #2c9a5b); }
+.mm-delta.menos { color: var(--erro, #c43d3d); }
+.mm-grafico { position: relative; width: 100%; }
+.mm-grafico svg { display: block; width: 100%; overflow: visible; }
+.mm-grade { stroke: var(--borda-fraca); stroke-width: 1; shape-rendering: crispEdges; }
+.mm-eixo { font-size: 10.5px; fill: var(--texto-4); font-variant-numeric: tabular-nums; }
+.mm-linha { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.mm-linha.fraca { stroke-width: 1.5; }
+.mm-hoje { stroke: var(--borda-hover); stroke-dasharray: 3 3; }
+.mm-mira { stroke: var(--borda-hover); stroke-width: 1; shape-rendering: crispEdges; }
+.mm-ponto { stroke: var(--opaco); stroke-width: 2; }
+[data-tema='claro'] .mm-ponto { stroke: #fff; }
+.mm-rotulo { font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mm-legenda i.linha { width: 14px; height: 2px; border-radius: 1px; }
+
 /* ---------------------------------------------------------------- aba CRM */
 .crm td.num, .crm th.num { text-align: right; }
 .crm td:first-child { white-space: normal; }
@@ -401,6 +422,13 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   </div>
 
   <div id="aba-leads" hidden>
+    <section class="dash-secao">
+      <div class="dash-secao-topo"><h2 class="com-dica">Leads mês a mês<span data-dica="mesAMes"></span></h2></div>
+      <div class="mm-compara" id="mm-compara"></div>
+      <div class="dash-legenda mm-legenda" id="mm-legenda"></div>
+      <div class="mm-grafico" id="mm-grafico"></div>
+      <details class="dash-tabela-ver"><summary>Ver em tabela</summary><div class="tabela-rolagem" id="mm-tabela"></div></details>
+    </section>
     <section class="dash-kpis" id="kpis-leads" aria-label="Leads por região"></section>
     <section class="dash-secao">
       <div class="dash-secao-topo"><h2 class="com-dica"><span id="titulo-leads-tempo">Leads</span><span data-dica="leadsTempo"></span></h2></div>
@@ -537,6 +565,9 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
     crm: ['Cards em cada etapa dos funis Leads e Oportunidades do Kommo, no fim de cada dia. O histórico começa em 10/10, quando os funis foram criados.',
       'Agora = fim do período; início = fim do dia anterior ao período. Entraram = cards que chegaram na etapa no período (por mudança de etapa ou lead criado já nela). A linha mostra o estoque dia a dia.',
       'Convertido, Desqualificado, Fechado ganho e Fechado perdido são etapas fechadas e não entram no total de abertos.'],
+    mesAMes: ['Leads criados no Kommo, somados dia a dia dentro de cada mês. Cada linha é um mês; o mês atual vai até hoje.',
+      'A comparação usa o mesmo dia do mês: este mês até hoje contra o mês passado até o mesmo dia.',
+      'Segue o filtro de origem; não muda com o período.'],
     leadsTempo: ['Leads criados no Kommo, pela hora em que chegaram, separados pelo DDD do telefone. Florianópolis = DDD 48; interior de SC = 47 e 49; outros estados = qualquer outro DDD do Brasil.',
       'O DDD 48 também cobre o sul do estado (Criciúma, Tubarão, Laguna), que fica junto com Florianópolis.'],
     leadsMes: ['Todos os meses desde o início do Kommo, com o filtro de origem aplicado. Não muda com o período.'],
@@ -591,6 +622,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   // Um ouvinte só para a página toda: cada alvo guarda o html da dica em data-tip.
   let tipPendente = null;
   document.addEventListener('pointermove', (e) => {
+    if (e.target.closest && e.target.closest('[data-tip-proprio]')) return; // o gráfico cuida da própria dica
     const alvo = e.target.closest && e.target.closest('[data-tip]');
     if (!alvo || e.pointerType === 'touch') { tipPendente = null; return esconderTip(); }
     if (!tipPendente) requestAnimationFrame(() => { if (tipPendente) mostrarTip(tipPendente.e, tipPendente.html); tipPendente = null; });
@@ -972,6 +1004,85 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
       : '<p class="sutil" style="margin:0;font-size:13px">Nenhum lead de outro estado no período.</p>';
   }
 
+  // ------------------------------------------------------------ leads mês a mês: acumulado por dia do mês
+  const NOMES_MES_LONGO = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const nomeMes = (m) => NOMES_MES_LONGO[+m.slice(5, 7) - 1];
+  const diasNoMes = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7), 0)).getUTCDate();
+  function desenharMesAMes() {
+    const caixa = $('mm-grafico'); if (!caixa) return;
+    const css = getComputedStyle(document.documentElement);
+    const hj = hoje(), mesAtual = hj.slice(0, 7), diaHoje = +hj.slice(8, 10);
+    // leads por mês e dia (com o filtro de origem)
+    const porDia = {};
+    for (const [h, , , q] of linhasLeads([D.primeiroDia || '2000-01-01', hj])) {
+      const m = h.slice(0, 7), d = +h.slice(8, 10);
+      (porDia[m] ??= Array(32).fill(0))[d] += q;
+    }
+    // só meses completos desde o início do Kommo (julho começou em 05/07, entra mesmo assim), no máximo os 4 últimos
+    const meses = Object.keys(porDia).sort().slice(-4);
+    if (!meses.length) { caixa.innerHTML = '<p class="sutil" style="margin:0;font-size:13px">Sem leads.</p>'; return; }
+    const acum = Object.fromEntries(meses.map((m) => {
+      const ult = m === mesAtual ? diaHoje : diasNoMes(m);
+      const a = []; let t = 0;
+      for (let d = 1; d <= ult; d++) { t += porDia[m][d]; a.push(t); }
+      return [m, a];
+    }));
+    const anterior = meses.filter((m) => m < mesAtual).at(-1);
+    const corDe = (m) => m === mesAtual ? css.getPropertyValue('--serie-1').trim() : m === anterior ? css.getPropertyValue('--serie-2').trim() : css.getPropertyValue('--texto-4').trim();
+
+    // comparação no mesmo dia
+    const ateHoje = (m) => acum[m]?.[Math.min(diaHoje, acum[m].length) - 1] ?? 0;
+    const atual = ateHoje(mesAtual), passado = anterior ? ateHoje(anterior) : null;
+    const delta = passado ? (atual - passado) / passado : null;
+    const totalMes = (m) => acum[m].at(-1);
+    $('mm-compara').innerHTML =
+      `<div><span class="rot">${nomeMes(mesAtual)[0].toUpperCase() + nomeMes(mesAtual).slice(1)} até o dia ${diaHoje}</span><b>${n(atual)}</b></div>` +
+      (anterior ? `<div><span class="rot">${nomeMes(anterior)[0].toUpperCase() + nomeMes(anterior).slice(1)} até o dia ${diaHoje}</span><b>${n(passado)}</b></div>` +
+        `<div><span class="rot">Diferença</span><span class="mm-delta ${delta >= 0 ? 'mais' : 'menos'}">${delta >= 0 ? '+' : '−'}${n(Math.abs(atual - passado))} · ${delta >= 0 ? '+' : '−'}${pct(Math.abs(delta) * 100, 100, 0)}</span></div>` +
+        `<div><span class="rot">${nomeMes(anterior)[0].toUpperCase() + nomeMes(anterior).slice(1)} inteiro</span><b>${n(totalMes(anterior))}</b></div>` : '');
+    $('mm-legenda').innerHTML = meses.map((m) => `<span><i class="linha" style="background:${corDe(m)}"></i>${nomeMes(m)}${m === mesAtual ? ' (até hoje)' : ''} · ${n(totalMes(m))}</span>`).join('');
+
+    // gráfico
+    const W = Math.max(320, caixa.clientWidth || 800), H = 220, mE = 4, mD = 40, mT = 10, mB = 22;
+    const maxY = Math.max(1, ...meses.map((m) => totalMes(m)));
+    const bruto = maxY / 4, ordem = 10 ** Math.floor(Math.log10(bruto)), f2 = bruto / ordem;
+    const passo = (f2 > 5 ? 10 : f2 > 2 ? 5 : f2 > 1 ? 2 : 1) * ordem;
+    const topo = Math.ceil(maxY / passo) * passo;
+    const x = (d) => mE + ((d - 1) / 30) * (W - mE - mD), y = (v) => mT + (1 - v / topo) * (H - mT - mB);
+    let g = '';
+    for (let v = 0; v <= topo; v += passo) g += `<line class="mm-grade" x1="${mE}" x2="${W - mD}" y1="${y(v)}" y2="${y(v)}"/><text class="mm-eixo" x="${W - mD + 6}" y="${y(v) + 3.5}">${n(v)}</text>`;
+    for (const d of [1, 5, 10, 15, 20, 25, 30]) g += `<text class="mm-eixo" x="${x(d)}" y="${H - 4}" text-anchor="middle">${d}</text>`;
+    g += `<line class="mm-hoje" x1="${x(diaHoje)}" x2="${x(diaHoje)}" y1="${mT}" y2="${H - mB}"/>`;
+    // linhas: os meses antigos primeiro (por baixo), o atual por cima
+    const ordemDesenho = [...meses].sort((a, b) => (a === mesAtual) - (b === mesAtual) || (a === anterior) - (b === anterior));
+    for (const m of ordemDesenho) {
+      const a = acum[m], fraca = m !== mesAtual && m !== anterior;
+      g += `<polyline class="mm-linha${fraca ? ' fraca' : ''}" stroke="${corDe(m)}" points="${a.map((v, i) => `${x(i + 1).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}"/>`;
+    }
+    // rótulo no fim da linha do mês atual e no mesmo dia do mês anterior
+    if (acum[mesAtual]) g += `<circle class="mm-ponto" r="4" fill="${corDe(mesAtual)}" cx="${x(diaHoje)}" cy="${y(atual)}"/><text class="mm-rotulo" fill="${corDe(mesAtual)}" x="${x(diaHoje) - 8}" y="${y(atual) - 9}" text-anchor="end">${n(atual)}</text>`;
+    if (anterior) g += `<circle class="mm-ponto" r="3.5" fill="${corDe(anterior)}" cx="${x(diaHoje)}" cy="${y(passado)}"/><text class="mm-rotulo" fill="${corDe(anterior)}" x="${x(diaHoje) + 8}" y="${y(passado) + 14}">${n(passado)}</text>`;
+    g += `<line class="mm-mira" id="mm-mira" x1="0" x2="0" y1="${mT}" y2="${H - mB}" visibility="hidden"/><rect id="mm-alvo" data-tip-proprio x="${mE}" y="${mT}" width="${W - mE - mD}" height="${H - mT - mB}" fill="transparent"/>`;
+    caixa.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Leads acumulados por dia do mês: ${nomeMes(mesAtual)} ${n(atual)} até o dia ${diaHoje}${anterior ? `, ${nomeMes(anterior)} ${n(passado)} no mesmo dia` : ''}">${g}</svg>`;
+
+    // mira: o dia mais perto do ponteiro, com o acumulado de cada mês
+    const svg = caixa.querySelector('svg'), mira = svg.querySelector('#mm-mira'), alvo = svg.querySelector('#mm-alvo');
+    alvo.addEventListener('pointermove', (e) => {
+      const r = svg.getBoundingClientRect(), px = ((e.clientX - r.left) / r.width) * W;
+      const d = Math.min(31, Math.max(1, Math.round(((px - mE) / (W - mE - mD)) * 30 + 1)));
+      mira.setAttribute('x1', x(d)); mira.setAttribute('x2', x(d)); mira.setAttribute('visibility', 'visible');
+      const linhas = [...meses].reverse().filter((m) => acum[m][d - 1] != null)
+        .map((m) => linhaTip(corDe(m), n(acum[m][d - 1]), nomeMes(m))).join('');
+      mostrarTip(e, `<div class="dash-tip-titulo">Até o dia ${d}</div>${linhas || '<div class="dash-tip-nota">sem dado</div>'}`);
+    });
+    alvo.addEventListener('pointerleave', () => { mira.setAttribute('visibility', 'hidden'); esconderTip(); });
+
+    // tabela: acumulado por dia, um mês por coluna
+    $('mm-tabela').innerHTML = `<table class="tabela"><thead><tr><th>Dia</th>${meses.map((m) => `<th>${nomeMes(m)}</th>`).join('')}</tr></thead><tbody>` +
+      Array.from({ length: 31 }, (_, i) => `<tr><td>${i + 1}</td>${meses.map((m) => `<td>${acum[m][i] != null ? n(acum[m][i]) : ''}</td>`).join('')}</tr>`).join('') + '</tbody></table>';
+  }
+  addEventListener('resize', () => { if (abaAtual() === 'leads') desenharMesAMes(); });
+
   // ------------------------------------------------------------ aba CRM: evolução das etapas do Kommo
   // De onde cada etapa recebe os cards (para a passagem). Caminho: Entrada → Abordagem → Conectado → Convertido;
   // SQL → Agendada → Compareceu → Em negociação → Aguardando compra → Fechado ganho. Desvios medem sobre a etapa de onde saem.
@@ -1175,7 +1286,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
     $('avaliacao').hidden = aba !== 'funil'; // o tipo de avaliação só vale no Funil
     $('origem').hidden = aba === 'crm'; // a evolução do Kommo não é separada por etiqueta
     desenharPeriodo(); desenharOrigem(); desenharAvaliacao(); desenharAtualizado();
-    if (aba === 'leads') desenharLeads(iv);
+    if (aba === 'leads') { desenharMesAMes(); desenharLeads(iv); }
     else if (aba === 'crm') desenharCrm(iv);
     else { const r = resumo(linhasDe(iv, estado.origem)); desenharKpis(r, iv); desenharFunil(r); desenharTempos(r); desenharRastreio(iv); }
     document.title = `${{ leads: 'Leads', crm: 'CRM', funil: 'Funil' }[aba]} · ${nomeIntervalo(iv)} · Elora`;
