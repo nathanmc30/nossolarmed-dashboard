@@ -44,6 +44,8 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
 .sutil { color: var(--texto-3); }
 
 .tela { max-width: 1240px; margin: 0 auto; padding: 16px 24px 40px; display: flex; flex-direction: column; gap: 14px; }
+/* cada aba empilha os blocos com o mesmo respiro da tela (sem isso os cartões grudam) */
+#aba-funil:not([hidden]), #aba-leads:not([hidden]), #aba-crm:not([hidden]) { display: flex; flex-direction: column; gap: 14px; }
 
 /* ---------------------------------------------------------------- topo: duas faixas */
 .dash-topo { display: flex; flex-direction: column; gap: 10px; }
