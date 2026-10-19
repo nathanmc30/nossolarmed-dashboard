@@ -519,7 +519,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
   const DICAS = {
     funil: ['Leads criados no Kommo no período (sem o funil Contatos). O que aconteceu depois vem do Clinicorp, casado pelo telefone.',
       'Cada etapa conta o que aconteceu no período, pela data do fato, mesmo que não sejam as mesmas pessoas: avaliações marcadas (dia em que a recepção marcou), comparecidas (dia da consulta), orçamentos emitidos e aprovados (dia de cada um).',
-      'Avaliação = só as categorias de anúncio no Clinicorp: Avaliação Meta, Avaliação Google e Urgência Google; cancelada não conta. Orçamento e aprovação só de quem fez avaliação nos 120 dias anteriores. Orçamentos de R$ 0 e o lote de 27/07 ficam de fora.',
+      'Avaliação = só as categorias de anúncio no Clinicorp: Avaliação Meta, Avaliação Google e Urgência Google; cancelada não conta. Orçamento e aprovação de quem fez uma dessas avaliações antes, em qualquer data. Orçamentos de R$ 0 e o lote de 27/07 ficam de fora.',
       'Percentual de cada linha: agendaram ÷ leads; compareceram ÷ avaliações previstas no período; orçamento e aprovação ÷ comparecidas.'],
     marcadas: ['Avaliações (Meta, Google e Urgência Google, ou as escolhidas no filtro Avaliação) marcadas no Clinicorp no período, pela data em que a recepção marcou. Conta todas, inclusive de quem chegou em dias anteriores ou não está no Kommo. Canceladas não contam.'],
     agendaram: ['Avaliações marcadas no período ÷ leads que chegaram no período, mesmo que não sejam as mesmas pessoas (a avaliação de hoje pode ser de um lead de ontem).'],
@@ -528,7 +528,7 @@ button, a { font: inherit; color: inherit; cursor: pointer; touch-action: manipu
     casa: ['Vendas do período de quem nunca fez avaliação de anúncio: base de pacientes, avaliação de outra origem (Indicação, Outdoor…) ou paciente novo marcado como procedimento. O detalhe está no Rastreio das vendas.'],
     rastreio: ['Toda venda (orçamento aprovado) do período, classificada pelo histórico do paciente na agenda do Clinicorp. O total bate com o aprovado no Clinicorp.',
       'Clique numa linha para ver quem comprou. A lista é protegida por senha.',
-      'Marketing: o paciente fez Avaliação Meta, Google ou Urgência Google antes de comprar, em qualquer tempo (é a base do CAC). As vendas com avaliação há mais de 120 dias aparecem na nota da linha e ficam fora da taxa de aprovação.',
+      'Marketing: o paciente fez Avaliação Meta, Google ou Urgência Google antes de comprar, em qualquer tempo (é a base do CAC). Sem janela de tempo: a mesma conta do funil.',
       'Outras origens: paciente novo cuja 1ª consulta foi marcada como procedimento, base de pacientes (retorno), avaliação de outra origem, reavaliação ou sem histórico.',
       'Conta pacientes por dia. Este quadro não muda com o filtro de avaliação.'],
     passagem: ['Cards que entraram nesta etapa no período ÷ cards que entraram na etapa de onde ela vem, no mesmo período (pela data de cada mudança, mesmo que não sejam os mesmos cards).',
